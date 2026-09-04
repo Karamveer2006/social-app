@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -14,6 +14,10 @@ import { colors } from '../theme/colors';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+const SocialIcon = ({ color }) => <Text style={[styles.tabIcon, { color }]}>🌐</Text>;
+const CreateIcon = ({ color }) => <Text style={[styles.tabIcon, { color }]}>➕</Text>;
+const ProfileIcon = ({ color }) => <Text style={[styles.tabIcon, { color }]}>👤</Text>;
+
 function BottomTabs() {
   return (
     <Tab.Navigator
@@ -21,17 +25,8 @@ function BottomTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
-        tabBarLabelStyle: {
-          fontWeight: '700',
-          fontSize: 11,
-        },
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
       <Tab.Screen
@@ -39,7 +34,7 @@ function BottomTabs() {
         component={FeedScreen}
         options={{
           tabBarLabel: 'Social Feed',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🌐</Text>,
+          tabBarIcon: SocialIcon,
         }}
       />
       <Tab.Screen
@@ -47,7 +42,7 @@ function BottomTabs() {
         component={CreatePostScreen}
         options={{
           tabBarLabel: 'Create',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>➕</Text>,
+          tabBarIcon: CreateIcon,
         }}
       />
       <Tab.Screen
@@ -55,7 +50,7 @@ function BottomTabs() {
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👤</Text>,
+          tabBarIcon: ProfileIcon,
         }}
       />
     </Tab.Navigator>
@@ -73,3 +68,20 @@ export function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: colors.card,
+    borderTopColor: colors.border,
+    height: 60,
+    paddingBottom: 8,
+    paddingTop: 6,
+  },
+  tabBarLabel: {
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  tabIcon: {
+    fontSize: 20,
+  },
+});
