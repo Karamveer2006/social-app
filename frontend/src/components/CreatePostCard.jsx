@@ -136,9 +136,11 @@ export const CreatePostCard = ({ onPostCreated }) => {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               variant="standard"
-              InputProps={{
-                disableUnderline: true,
-                sx: { fontSize: '1rem', color: '#0F172A', p: 0.5 },
+              slotProps={{
+                input: {
+                  disableUnderline: true,
+                  sx: { fontSize: '1rem', color: '#0F172A', p: 0.5 },
+                },
               }}
             />
 

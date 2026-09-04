@@ -79,30 +79,32 @@ export const CommentSection = ({ postId, comments = [], onAddComment }) => {
                 pr: 0.5,
               },
             }}
-            InputProps={{
-              endAdornment: (
-                <IconButton
-                  type="submit"
-                  color="primary"
-                  size="small"
-                  disabled={!text.trim() || submitting}
-                  sx={{
-                    bgcolor: text.trim() ? 'primary.main' : 'transparent',
-                    color: text.trim() ? '#fff !important' : 'text.disabled',
-                    '&:hover': {
-                      bgcolor: text.trim() ? 'primary.dark' : 'transparent',
-                    },
-                    width: 30,
-                    height: 30,
-                  }}
-                >
-                  {submitting ? (
-                    <CircularProgress size={16} color="inherit" />
-                  ) : (
-                    <SendIcon sx={{ fontSize: 16 }} />
-                  )}
-                </IconButton>
-              ),
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <IconButton
+                    type="submit"
+                    color="primary"
+                    size="small"
+                    disabled={!text.trim() || submitting}
+                    sx={{
+                      bgcolor: text.trim() ? 'primary.main' : 'transparent',
+                      color: text.trim() ? '#fff !important' : 'text.disabled',
+                      '&:hover': {
+                        bgcolor: text.trim() ? 'primary.dark' : 'transparent',
+                      },
+                      width: 30,
+                      height: 30,
+                    }}
+                  >
+                    {submitting ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <SendIcon sx={{ fontSize: 16 }} />
+                    )}
+                  </IconButton>
+                ),
+              },
             }}
           />
         </Box>

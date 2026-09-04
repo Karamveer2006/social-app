@@ -205,7 +205,7 @@ export const FeedPage = () => {
       <Container maxWidth="lg" sx={{ mt: 3 }}>
         <Grid container spacing={3}>
           {/* Left Column (Main Feed & Post Composer) */}
-          <Grid item xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             {/* Create Post Widget */}
             <CreatePostCard onPostCreated={handlePostCreated} />
 
@@ -265,7 +265,7 @@ export const FeedPage = () => {
           </Grid>
 
           {/* Right Column (Community info & Active User Card) */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box sx={{ position: { md: 'sticky' }, top: 88 }}>
               {/* User profile card */}
               {isAuthenticated && user && (
