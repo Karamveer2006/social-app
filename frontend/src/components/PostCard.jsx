@@ -1,0 +1,231 @@
+import React, { useState } from 'react';
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardActions,
+  Avatar,
+  IconButton,
+  Typography,
+  Box,
+  Button,
+  Menu,
+  MenuItem,
+  Tooltip,
+} from '@mui/material';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import ChatBubbleOutlinedIcon from '@mui/icons-material/ChatBubbleOutlined';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import DeleteIcon from '@mui/icons-material/Delete';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import { useAuth } from '../context/AuthContext';
+import { CommentSection } from './CommentSection';
+import { LikesModal } from './LikesModal';
+
+dayjs.extend(relativeTime);
+
+export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => {
+  const { user, isAuthenticated } = useAuth();
+  const [showComments, setShowComments] = useState(false);
+  const [showLikesModal, setShowLikesModal] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState(null);
+
+  const isLiked = post.isLikedByMe;
+  const isAuthor = user && post.author?.userId && (user._id === post.author.userId);
+
+  const handleLikeClick = () => {
+    if (!isAuthenticated) {
+      alert('Please log in to like posts!');
+      return;
+    }
+    onToggleLike(post._id);
+  };
+
+  const handleMenuOpen = (e) => setMenuAnchor(e.currentTarget);
+  const handleMenuClose = () => setMenuAnchor(null);
+
+  const handleDelete = () => {
+    handleMenuClose();
+    if (window.confirm('Are you sure you want to delete this post?')) {
+      onDeletePost(post._id);
+    }
+  };
+
+  return (
+    <Card sx={{ mb: 2.5, border: '1px solid #E2E8F0' }} className="animate-fade-in">
+      {/* Post Author Header */}
+      <CardHeader
+        avatar={
+          <Avatar
+            src={post.author?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.username}`}
+            alt={post.author?.name || post.author?.username}
+            sx={{ width: 44, height: 44, border: '1.5px solid #E2E8F0' }}
+          >
+            {post.author?.name?.[0] || post.author?.username?.[0] || 'U'}
+          </Avatar>
+        }
+        action={
+          isAuthor ? (
+            <>
+              <IconButton size="small" onClick={handleMenuOpen} sx={{ color: 'text.secondary' }}>
+                <MoreVertIcon fontSize="small" />
+              </IconButton>
+              <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleMenuClose}>
+                <MenuItem onClick={handleDelete} sx={{ color: 'error.main', fontSize: '0.875rem' }}>
+                  <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+                  Delete Post
+                </MenuItem>
+              </Menu>
+            </>
+          ) : null
+        }
+        title={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+              {post.author?.name || post.author?.username}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              @{post.author?.username}
+            </Typography>
+          </Box>
+        }
+        subheader={
+          <Typography variant="caption" color="text.disabled">
+            {post.createdAt ? dayjs(post.createdAt).fromNow() : 'just now'}
+          </Typography>
+        }
+        sx={{ pb: 1 }}
+      />
+
+      {/* Post Body (Content Text) */}
+      {post.content && (
+        <CardContent sx={{ pt: 0, pb: 1 }}>
+          <Typography
+            variant="body1"
+            sx={{
+              color: '#0F172A',
+              fontSize: '0.975rem',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {post.content}
+          </Typography>
+        </CardContent>
+      )}
+
+      {/* Post Media (Image) */}
+      {post.imageUrl && (
+        <Box className="post-media-container" sx={{ px: { xs: 0, sm: 2 } }}>
+          <img
+            src={post.imageUrl}
+            alt="Post attachment"
+            className="post-media-image"
+            loading="lazy"
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Action Bar (Likes, Comments Count & Triggers) */}
+      <CardActions
+        disableSpacing
+        sx={{
+          px: 2,
+          py: 1,
+          borderTop: '1px solid #F1F5F9',
+          display: 'flex',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {/* Like Button */}
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Tooltip title={isLiked ? 'Unlike' : 'Like'}>
+              <IconButton
+                onClick={handleLikeClick}
+                size="small"
+                sx={{
+                  color: isLiked ? '#EF4444' : '#64748B',
+                  transition: 'transform 0.15s ease',
+                  '&:active': { transform: 'scale(1.25)' },
+                }}
+              >
+                {isLiked ? (
+                  <FavoriteIcon className="heart-active" sx={{ fontSize: 22 }} />
+                ) : (
+                  <FavoriteBorderIcon sx={{ fontSize: 22 }} />
+                )}
+              </IconButton>
+            </Tooltip>
+            <Button
+              size="small"
+              onClick={() => setShowLikesModal(true)}
+              sx={{
+                p: 0.5,
+                minWidth: 'auto',
+                color: isLiked ? '#EF4444' : 'text.secondary',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                textTransform: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              {post.likesCount || 0} {post.likesCount === 1 ? 'Like' : 'Likes'}
+            </Button>
+          </Box>
+
+          {/* Comment Toggle Button */}
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Tooltip title="View comments">
+              <IconButton
+                onClick={() => setShowComments(!showComments)}
+                size="small"
+                sx={{ color: showComments ? 'primary.main' : '#64748B' }}
+              >
+                <ChatBubbleOutlinedIcon sx={{ fontSize: 21 }} />
+              </IconButton>
+            </Tooltip>
+            <Button
+              size="small"
+              onClick={() => setShowComments(!showComments)}
+              sx={{
+                p: 0.5,
+                minWidth: 'auto',
+                color: showComments ? 'primary.main' : 'text.secondary',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                textTransform: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              {post.commentsCount || 0} {post.commentsCount === 1 ? 'Comment' : 'Comments'}
+            </Button>
+          </Box>
+        </Box>
+      </CardActions>
+
+      {/* Expandable Comment Section */}
+      {showComments && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <CommentSection
+            postId={post._id}
+            comments={post.comments || []}
+            onAddComment={onAddComment}
+          />
+        </Box>
+      )}
+
+      {/* Modal displaying list of users who liked this post */}
+      <LikesModal
+        open={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+        likes={post.likes || []}
+      />
+    </Card>
+  );
+};

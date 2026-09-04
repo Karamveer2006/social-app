@@ -1,0 +1,162 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import request from 'supertest';
+import mongoose from 'mongoose';
+import app from '../src/app.js';
+import { connectDB, disconnectDB } from '../src/config/db.js';
+
+test.before(async () => {
+  process.env.NODE_ENV = 'test';
+  await connectDB();
+});
+
+test.after(async () => {
+  await disconnectDB();
+});
+
+test('API Integration Suite: Auth, Posts, Likes, Comments, and Collection Rule', async (t) => {
+  let authToken = '';
+  let testUserId = '';
+  let postId = '';
+
+  await t.test('1. Health Check Endpoint', async () => {
+    const res = await request(app).get('/api/health');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.status, 'healthy');
+  });
+
+  await t.test('2. User Signup & Login Flow', async () => {
+    const uniqueNum = Date.now();
+    const signupData = {
+      name: 'Test Tester',
+      username: `tester_${uniqueNum}`,
+      email: `tester_${uniqueNum}@example.com`,
+      password: 'StrongPassword123!',
+    };
+
+    const signupRes = await request(app)
+      .post('/api/auth/signup')
+      .send(signupData);
+
+    assert.equal(signupRes.status, 201);
+    assert.equal(signupRes.body.success, true);
+    assert.ok(signupRes.body.data.token);
+    assert.equal(signupRes.body.data.user.username, signupData.username);
+
+    // Login with same credentials
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: signupData.email,
+        password: signupData.password,
+      });
+
+    assert.equal(loginRes.status, 200);
+    assert.equal(loginRes.body.success, true);
+    assert.ok(loginRes.body.data.token);
+    authToken = loginRes.body.data.token;
+    testUserId = loginRes.body.data.user._id;
+  });
+
+  await t.test('3. Post Creation (Text Only, Image Only, Both, and Validation)', async () => {
+    // 3a. Reject empty text and empty image
+    const emptyRes = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ content: '', imageUrl: '' });
+    assert.equal(emptyRes.status, 400);
+
+    // 3b. Text-only post
+    const textPostRes = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ content: 'Hello World from test suite!' });
+    assert.equal(textPostRes.status, 201);
+    assert.equal(textPostRes.body.data.post.content, 'Hello World from test suite!');
+    assert.equal(textPostRes.body.data.post.imageUrl, '');
+    postId = textPostRes.body.data.post._id;
+
+    // 3c. Image-only post
+    const imgPostRes = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ imageUrl: 'https://example.com/test-image.jpg' });
+    assert.equal(imgPostRes.status, 201);
+    assert.equal(imgPostRes.body.data.post.content, '');
+    assert.equal(imgPostRes.body.data.post.imageUrl, 'https://example.com/test-image.jpg');
+
+    // 3d. Both text and image
+    const bothPostRes = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        content: 'Post with both text and photo',
+        imageUrl: 'https://example.com/photo.png',
+      });
+    assert.equal(bothPostRes.status, 201);
+  });
+
+  await t.test('4. Public Feed & Pagination', async () => {
+    const feedRes = await request(app).get('/api/posts?page=1&limit=5');
+    assert.equal(feedRes.status, 200);
+    assert.equal(feedRes.body.success, true);
+    assert.ok(Array.isArray(feedRes.body.data.posts));
+    assert.ok(feedRes.body.data.pagination);
+    assert.equal(feedRes.body.data.pagination.page, 1);
+  });
+
+  await t.test('5. Like & Unlike Toggle with Username tracking', async () => {
+    // Like post
+    const likeRes = await request(app)
+      .put(`/api/posts/${postId}/like`)
+      .set('Authorization', `Bearer ${authToken}`);
+    assert.equal(likeRes.status, 200);
+    assert.equal(likeRes.body.data.isLikedByMe, true);
+    assert.equal(likeRes.body.data.likesCount, 1);
+    assert.ok(likeRes.body.data.likes.some((l) => l.userId.toString() === testUserId));
+
+    // Check likes endpoint
+    const getLikesRes = await request(app).get(`/api/posts/${postId}/likes`);
+    assert.equal(getLikesRes.status, 200);
+    assert.equal(getLikesRes.body.data.likesCount, 1);
+    assert.ok(getLikesRes.body.data.likes.length > 0);
+
+    // Unlike post (toggle)
+    const unlikeRes = await request(app)
+      .put(`/api/posts/${postId}/like`)
+      .set('Authorization', `Bearer ${authToken}`);
+    assert.equal(unlikeRes.status, 200);
+    assert.equal(unlikeRes.body.data.isLikedByMe, false);
+    assert.equal(unlikeRes.body.data.likesCount, 0);
+  });
+
+  await t.test('6. Comment Flow with Username tracking', async () => {
+    const commentText = 'This is an awesome post!';
+    const commentRes = await request(app)
+      .post(`/api/posts/${postId}/comment`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ text: commentText });
+
+    assert.equal(commentRes.status, 201);
+    assert.equal(commentRes.body.data.commentsCount, 1);
+    assert.equal(commentRes.body.data.comment.text, commentText);
+    assert.ok(commentRes.body.data.comment.username);
+  });
+
+  await t.test('7. STRICT CONSTRAINT CHECK: Only 2 MongoDB Collections', async () => {
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    const collectionNames = collections.map((c) => c.name);
+
+    console.log('MongoDB Collections in Database:', collectionNames);
+
+    // Check that only users and posts exist
+    const nonSystemCollections = collectionNames.filter((name) => !name.startsWith('system.'));
+    assert.equal(
+      nonSystemCollections.length,
+      2,
+      `Expected exactly 2 collections (users and posts), but found: ${nonSystemCollections.join(', ')}`
+    );
+    assert.ok(nonSystemCollections.includes('users'));
+    assert.ok(nonSystemCollections.includes('posts'));
+  });
+});
