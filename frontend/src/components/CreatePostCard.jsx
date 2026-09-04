@@ -109,7 +109,7 @@ export const CreatePostCard = ({ onPostCreated }) => {
   const isSubmitDisabled = (!content.trim() && !previewUrl) || loading;
 
   return (
-    <Card sx={{ mb: 3, border: '1px solid #E2E8F0' }}>
+    <Card sx={{ mb: 3, border: '1px solid', borderColor: 'divider' }}>
       <CardContent sx={{ p: 2.5 }}>
         {error && (
           <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2, borderRadius: 2 }}>
@@ -139,7 +139,7 @@ export const CreatePostCard = ({ onPostCreated }) => {
               slotProps={{
                 input: {
                   disableUnderline: true,
-                  sx: { fontSize: '1rem', color: '#0F172A', p: 0.5 },
+                  sx: { fontSize: '1rem', color: 'text.primary', p: 0.5 },
                 },
               }}
             />
@@ -153,9 +153,10 @@ export const CreatePostCard = ({ onPostCreated }) => {
                   mb: 1.5,
                   borderRadius: 3,
                   overflow: 'hidden',
-                  border: '1px solid #E2E8F0',
+                  border: '1px solid',
+                  borderColor: 'divider',
                   maxHeight: 280,
-                  bgcolor: '#F8FAFC',
+                  bgcolor: 'background.default',
                 }}
               >
                 <img

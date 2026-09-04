@@ -67,6 +67,14 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
   };
 
+  const updateUser = async (updatedUserData) => {
+    setUser((prev) => {
+      const merged = { ...prev, ...updatedUserData };
+      AsyncStorage.setItem('taskplanet_mobile_user', JSON.stringify(merged));
+      return merged;
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -77,6 +85,7 @@ export const AuthProvider = ({ children }) => {
         login,
         signup,
         logout,
+        updateUser,
       }}
     >
       {children}

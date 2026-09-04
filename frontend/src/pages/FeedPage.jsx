@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Container,
   Box,
   Typography,
-  Button,
   CircularProgress,
   Alert,
   Grid,
@@ -11,13 +10,16 @@ import {
   CardContent,
   Avatar,
   Divider,
+  Button,
 } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
+import { Link } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { CreatePostCard } from '../components/CreatePostCard';
 import { PostCard } from '../components/PostCard';
+import { MobileBottomNav } from '../components/MobileBottomNav';
 import { postsAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -30,6 +32,9 @@ export const FeedPage = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
 
+  // IntersectionObserver sentinel ref for infinite scroll
+  const observerRef = useRef(null);
+
   // Fetch feed with pagination
   const fetchFeed = useCallback(async (pageNum = 1, append = false) => {
     try {
@@ -40,7 +45,12 @@ export const FeedPage = () => {
       const res = await postsAPI.getFeed(pageNum, 5);
       if (res.success && res.data) {
         if (append) {
-          setPosts((prev) => [...prev, ...res.data.posts]);
+          setPosts((prev) => {
+            // Deduplicate posts
+            const existingIds = new Set(prev.map((p) => p._id));
+            const newPosts = res.data.posts.filter((p) => !existingIds.has(p._id));
+            return [...prev, ...newPosts];
+          });
         } else {
           setPosts(res.data.posts);
         }
@@ -59,6 +69,31 @@ export const FeedPage = () => {
     fetchFeed(1, false);
   }, [fetchFeed]);
 
+  // Infinite scroll effect using IntersectionObserver
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore) return;
+
+    const currentSentinel = observerRef.current;
+    if (!currentSentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          fetchFeed(page + 1, true);
+        }
+      },
+      { threshold: 0.1, rootMargin: '150px' }
+    );
+
+    observer.observe(currentSentinel);
+
+    return () => {
+      if (currentSentinel) {
+        observer.unobserve(currentSentinel);
+      }
+    };
+  }, [hasMore, loadingMore, loading, page, fetchFeed]);
+
   // Handle post created
   const handlePostCreated = async (postPayload) => {
     const res = await postsAPI.createPost(postPayload);
@@ -68,11 +103,10 @@ export const FeedPage = () => {
     }
   };
 
-  // Optimistic Like Update (Requirement: Like updates reflect instantly in UI!)
+  // Optimistic Like Update
   const handleToggleLike = async (postId) => {
     if (!user) return;
 
-    // Snapshot current state for rollback
     const previousPosts = [...posts];
 
     // Optimistically update
@@ -108,7 +142,6 @@ export const FeedPage = () => {
     try {
       const res = await postsAPI.toggleLike(postId);
       if (res.success && res.data) {
-        // Sync with exact server response
         setPosts((prevPosts) =>
           prevPosts.map((p) =>
             p._id === postId
@@ -124,16 +157,14 @@ export const FeedPage = () => {
       }
     } catch (err) {
       console.error('Like failed, reverting optimistic update:', err);
-      // Revert on error
       setPosts(previousPosts);
     }
   };
 
-  // Optimistic Comment Update (Requirement: Comment updates reflect instantly in UI!)
-  const handleAddComment = async (postId, text) => {
+  // Optimistic Comment Update (supports replyTo parameter!)
+  const handleAddComment = async (postId, text, replyTo = '') => {
     if (!user) return;
 
-    // Temporary optimistic comment object
     const optimisticComment = {
       _id: `temp-${Date.now()}`,
       userId: user._id,
@@ -141,6 +172,7 @@ export const FeedPage = () => {
       name: user.name,
       avatar: user.avatar,
       text,
+      replyTo,
       createdAt: new Date().toISOString(),
     };
 
@@ -160,9 +192,8 @@ export const FeedPage = () => {
     );
 
     try {
-      const res = await postsAPI.addComment(postId, text);
+      const res = await postsAPI.addComment(postId, text, replyTo);
       if (res.success && res.data) {
-        // Replace temp comment with server result
         setPosts((prevPosts) =>
           prevPosts.map((p) =>
             p._id === postId
@@ -192,17 +223,11 @@ export const FeedPage = () => {
     }
   };
 
-  const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
-      fetchFeed(page + 1, true);
-    }
-  };
-
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#F1F5F9', pb: 8 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 11, md: 8 } }}>
       <Navbar />
 
-      <Container maxWidth="lg" sx={{ mt: 3 }}>
+      <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 3 } }}>
         <Grid container spacing={3}>
           {/* Left Column (Main Feed & Post Composer) */}
           <Grid size={{ xs: 12, md: 8 }}>
@@ -245,21 +270,32 @@ export const FeedPage = () => {
                   />
                 ))}
 
-                {/* Pagination: Load More */}
-                {hasMore && (
-                  <Box sx={{ textAlign: 'center', mt: 3, mb: 2 }}>
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
-                      startIcon={loadingMore ? <CircularProgress size={16} /> : <RefreshIcon />}
-                      sx={{ borderRadius: 3, px: 3, py: 1 }}
-                    >
-                      {loadingMore ? 'Loading more posts...' : 'Load More Posts'}
-                    </Button>
-                  </Box>
-                )}
+                {/* Infinite Scroll Sentinel */}
+                <Box
+                  ref={observerRef}
+                  sx={{
+                    py: 3,
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {loadingMore && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: 'text.secondary' }}>
+                      <CircularProgress size={22} color="primary" />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Loading more posts...
+                      </Typography>
+                    </Box>
+                  )}
+                  {!hasMore && posts.length > 0 && !loading && (
+                    <Typography variant="caption" color="text.secondary" sx={{ py: 1, letterSpacing: '0.02em' }}>
+                      ✓ You have caught up with all posts
+                    </Typography>
+                  )}
+                </Box>
               </>
             )}
           </Grid>
@@ -272,6 +308,8 @@ export const FeedPage = () => {
                 <Card sx={{ mb: 2.5, p: 2 }}>
                   <CardContent sx={{ p: '8px !important', textAlign: 'center' }}>
                     <Avatar
+                      component={Link}
+                      to={`/profile/${user.username}`}
                       src={user.avatar}
                       alt={user.name}
                       sx={{
@@ -280,11 +318,24 @@ export const FeedPage = () => {
                         mx: 'auto',
                         mb: 1.5,
                         border: '3px solid #2563EB',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
                       }}
                     >
                       {user.name?.[0]}
                     </Avatar>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    <Typography
+                      component={Link}
+                      to={`/profile/${user.username}`}
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        textDecoration: 'none',
+                        color: 'text.primary',
+                        display: 'block',
+                        '&:hover': { color: 'primary.main' },
+                      }}
+                    >
                       {user.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -295,6 +346,18 @@ export const FeedPage = () => {
                         {user.bio}
                       </Typography>
                     )}
+
+                    <Button
+                      component={Link}
+                      to={`/profile/${user.username}`}
+                      variant="outlined"
+                      size="small"
+                      startIcon={<PersonOutlinedIcon />}
+                      sx={{ mb: 2, borderRadius: 3, fontWeight: 600, fontSize: '0.8rem' }}
+                    >
+                      View Full Profile
+                    </Button>
+
                     <Divider sx={{ my: 1.5 }} />
                     <Box sx={{ display: 'flex', justifyContent: 'space-around' }}>
                       <Box>
@@ -306,11 +369,19 @@ export const FeedPage = () => {
                         </Typography>
                       </Box>
                       <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                          {posts.reduce((acc, p) => acc + (p.likes?.filter((l) => l.userId === user._id).length || 0), 0)}
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                          {user.followersCount || 0}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Likes Given
+                          Followers
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                          {user.followingCount || 0}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Following
                         </Typography>
                       </Box>
                     </Box>
@@ -340,6 +411,9 @@ export const FeedPage = () => {
           </Grid>
         </Grid>
       </Container>
+
+      {/* Mobile-only Bottom Tab Navigation Bar */}
+      <MobileBottomNav onPostCreated={handlePostCreated} />
     </Box>
   );
 };

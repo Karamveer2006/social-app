@@ -236,6 +236,7 @@ export const addComment = async (req, res) => {
       name: req.user.name,
       avatar: req.user.avatar,
       text: text.trim(),
+      replyTo: req.body.replyTo ? req.body.replyTo.trim() : '',
       createdAt: new Date(),
     };
 

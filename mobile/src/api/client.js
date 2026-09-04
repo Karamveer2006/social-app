@@ -62,8 +62,8 @@ export const postsAPI = {
     const res = await api.put(`/posts/${postId}/like`);
     return res.data;
   },
-  addComment: async (postId, text) => {
-    const res = await api.post(`/posts/${postId}/comment`, { text });
+  addComment: async (postId, text, replyTo = '') => {
+    const res = await api.post(`/posts/${postId}/comment`, { text, replyTo });
     return res.data;
   },
   getLikes: async (postId) => {
@@ -72,6 +72,21 @@ export const postsAPI = {
   },
   deletePost: async (postId) => {
     const res = await api.delete(`/posts/${postId}`);
+    return res.data;
+  },
+};
+
+export const usersAPI = {
+  getProfile: async (username) => {
+    const res = await api.get(`/users/${username}`);
+    return res.data;
+  },
+  updateProfile: async (profileData) => {
+    const res = await api.put('/users/profile', profileData);
+    return res.data;
+  },
+  toggleFollow: async (userId) => {
+    const res = await api.put(`/users/${userId}/follow`);
     return res.data;
   },
 };

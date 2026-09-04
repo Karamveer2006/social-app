@@ -16,11 +16,16 @@ import {
 import PublicIcon from '@mui/icons-material/Public';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAppTheme } from '../context/ThemeContext';
 
 export const Navbar = ({ onOpenCreateModal }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { mode, toggleTheme, isDark } = useAppTheme();
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = React.useState(null);
 
@@ -32,6 +37,13 @@ export const Navbar = ({ onOpenCreateModal }) => {
     setAnchorEl(null);
   };
 
+  const handleNavigateProfile = () => {
+    handleCloseMenu();
+    if (user?.username) {
+      navigate(`/profile/${user.username}`);
+    }
+  };
+
   const handleLogout = () => {
     handleCloseMenu();
     logout();
@@ -41,7 +53,7 @@ export const Navbar = ({ onOpenCreateModal }) => {
   return (
     <AppBar position="sticky" elevation={0} className="glass-nav">
       <Container maxWidth="lg">
-        <Toolbar disableGutters sx={{ minHeight: { xs: 60, sm: 68 } }}>
+        <Toolbar disableGutters sx={{ minHeight: { xs: 58, sm: 68 } }}>
           {/* App Brand */}
           <Box
             component={Link}
@@ -76,7 +88,7 @@ export const Navbar = ({ onOpenCreateModal }) => {
                 sx={{
                   fontWeight: 800,
                   fontSize: { xs: '1.05rem', sm: '1.25rem' },
-                  color: '#0F172A',
+                  color: 'text.primary',
                   lineHeight: 1.1,
                 }}
               >
@@ -98,7 +110,26 @@ export const Navbar = ({ onOpenCreateModal }) => {
           </Box>
 
           {/* Action Buttons */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.8, sm: 1.5 } }}>
+            {/* Theme Toggle Button (Light/Dark mode) */}
+            <Tooltip title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+              <IconButton
+                onClick={toggleTheme}
+                color="inherit"
+                sx={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: '10px',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                  color: isDark ? '#FACC15' : '#4B5563',
+                }}
+              >
+                {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+
             {isAuthenticated ? (
               <>
                 {onOpenCreateModal && (
@@ -142,7 +173,7 @@ export const Navbar = ({ onOpenCreateModal }) => {
                       mt: 1.5,
                       minWidth: 200,
                       borderRadius: 3,
-                      boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
                     },
                   }}
                   transformOrigin={{ horizontal: 'right', vertical: 'top' }}
@@ -157,6 +188,10 @@ export const Navbar = ({ onOpenCreateModal }) => {
                     </Typography>
                   </Box>
                   <Divider />
+                  <MenuItem onClick={handleNavigateProfile} sx={{ py: 1 }}>
+                    <PersonOutlinedIcon fontSize="small" sx={{ mr: 1.5, color: 'primary.main' }} />
+                    My Profile & Posts
+                  </MenuItem>
                   <MenuItem onClick={handleLogout} sx={{ color: 'error.main', py: 1 }}>
                     <LogoutIcon fontSize="small" sx={{ mr: 1.5 }} />
                     Log Out
@@ -179,7 +214,7 @@ export const Navbar = ({ onOpenCreateModal }) => {
                   to="/signup"
                   variant="contained"
                   color="primary"
-                  sx={{ borderRadius: 3 }}
+                  sx={{ borderRadius: 3, display: { xs: 'none', sm: 'inline-flex' } }}
                 >
                   Sign Up
                 </Button>

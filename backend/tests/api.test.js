@@ -143,7 +143,78 @@ test('API Integration Suite: Auth, Posts, Likes, Comments, and Collection Rule',
     assert.ok(commentRes.body.data.comment.username);
   });
 
-  await t.test('7. STRICT CONSTRAINT CHECK: Only 2 MongoDB Collections', async () => {
+  await t.test('7. Comment Reply Flow with replyTo tracking', async () => {
+    const replyText = '@testuser Thanks for the comment!';
+    const replyRes = await request(app)
+      .post(`/api/posts/${postId}/comment`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ text: replyText, replyTo: 'testuser' });
+
+    assert.equal(replyRes.status, 201);
+    assert.equal(replyRes.body.data.commentsCount, 2);
+    assert.equal(replyRes.body.data.comment.replyTo, 'testuser');
+    assert.equal(replyRes.body.data.comment.text, replyText);
+  });
+
+  await t.test('8. Update User Profile & Bio', async () => {
+    const updatedBio = 'Full-stack software developer passionate about building scalable apps.';
+    const updatedName = 'Test User Updated';
+
+    const updateRes = await request(app)
+      .put('/api/users/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        name: updatedName,
+        bio: updatedBio,
+      });
+
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.body.data.user.bio, updatedBio);
+    assert.equal(updateRes.body.data.user.name, updatedName);
+  });
+
+  let secondUserId = '';
+  await t.test('9. Follow / Unfollow System & Profile Lookup', async () => {
+    // Create second user
+    const signup2 = await request(app).post('/api/auth/signup').send({
+      name: 'Second User',
+      username: 'seconduser',
+      email: 'second@example.com',
+      password: 'password123',
+    });
+    assert.equal(signup2.status, 201);
+    secondUserId = signup2.body.data.user._id;
+
+    // Follow second user
+    const followRes = await request(app)
+      .put(`/api/users/${secondUserId}/follow`)
+      .set('Authorization', `Bearer ${authToken}`);
+
+    assert.equal(followRes.status, 200);
+    assert.equal(followRes.body.data.isFollowing, true);
+    assert.equal(followRes.body.data.followersCount, 1);
+
+    // Get second user profile
+    const profileRes = await request(app)
+      .get('/api/users/seconduser')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    assert.equal(profileRes.status, 200);
+    assert.equal(profileRes.body.data.user.username, 'seconduser');
+    assert.equal(profileRes.body.data.user.followersCount, 1);
+    assert.equal(profileRes.body.data.user.isFollowing, true);
+
+    // Unfollow second user
+    const unfollowRes = await request(app)
+      .put(`/api/users/${secondUserId}/follow`)
+      .set('Authorization', `Bearer ${authToken}`);
+
+    assert.equal(unfollowRes.status, 200);
+    assert.equal(unfollowRes.body.data.isFollowing, false);
+    assert.equal(unfollowRes.body.data.followersCount, 0);
+  });
+
+  await t.test('10. STRICT CONSTRAINT CHECK: Only 2 MongoDB Collections (users, posts)', async () => {
     const collections = await mongoose.connection.db.listCollections().toArray();
     const collectionNames = collections.map((c) => c.name);
 

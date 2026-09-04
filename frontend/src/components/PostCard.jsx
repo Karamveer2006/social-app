@@ -20,6 +20,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CommentSection } from './CommentSection';
 import { LikesModal } from './LikesModal';
@@ -54,14 +55,16 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
   };
 
   return (
-    <Card sx={{ mb: 2.5, border: '1px solid #E2E8F0' }} className="animate-fade-in">
+    <Card sx={{ mb: 2.5, border: '1px solid', borderColor: 'divider' }} className="animate-fade-in">
       {/* Post Author Header */}
       <CardHeader
         avatar={
           <Avatar
+            component={Link}
+            to={`/profile/${post.author?.username}`}
             src={post.author?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.username}`}
             alt={post.author?.name || post.author?.username}
-            sx={{ width: 44, height: 44, border: '1.5px solid #E2E8F0' }}
+            sx={{ width: 44, height: 44, border: '1.5px solid', borderColor: 'divider', textDecoration: 'none', cursor: 'pointer' }}
           >
             {post.author?.name?.[0] || post.author?.username?.[0] || 'U'}
           </Avatar>
@@ -83,7 +86,12 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
         }
         title={
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+            <Typography
+              component={Link}
+              to={`/profile/${post.author?.username}`}
+              variant="subtitle2"
+              sx={{ fontWeight: 700, fontSize: '0.95rem', textDecoration: 'none', color: 'text.primary', '&:hover': { color: 'primary.main' } }}
+            >
               {post.author?.name || post.author?.username}
             </Typography>
             <Typography variant="caption" color="text.secondary">
@@ -105,7 +113,7 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
           <Typography
             variant="body1"
             sx={{
-              color: '#0F172A',
+              color: 'text.primary',
               fontSize: '0.975rem',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
@@ -137,7 +145,8 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
         sx={{
           px: 2,
           py: 1,
-          borderTop: '1px solid #F1F5F9',
+          borderTop: '1px solid',
+          borderColor: 'divider',
           display: 'flex',
           justifyContent: 'space-between',
         }}
