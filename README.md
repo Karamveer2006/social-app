@@ -245,8 +245,4 @@ The deployed application runs clean with no hardcoded accounts or static demo da
 
 ---
 
-## 📋 Submission Details
-- **Assignment**: 3W Full Stack Internship Assignment — Task 1 (Mini Social Post Application)
-- **Reference**: [TaskPlanet App on Play Store](https://play.google.com/store/apps/details?id=com.taskplanet)
-- **Submission Form**: [Round 1 Task Submission Form](https://forms.gle/eriRaMuN8Tu6t4Rs7)
-- **Deadline**: 6 September 2026
+
