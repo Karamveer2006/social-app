@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authAPI } from '../api/client';
+import { authAPI, usersAPI } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -26,6 +26,12 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.warn('Session load error:', err);
+        if (err.response?.status === 401) {
+          await AsyncStorage.removeItem('taskplanet_mobile_token');
+          await AsyncStorage.removeItem('taskplanet_mobile_user');
+          setToken(null);
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -75,6 +81,36 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const toggleFollowUser = async (targetUserId) => {
+    try {
+      const res = await usersAPI.toggleFollow(targetUserId);
+      if (res.success && res.data) {
+        const isFollowing = res.data.isFollowing;
+        const actualTargetId = (res.data.targetUserId || targetUserId).toString();
+        setUser((prev) => {
+          if (!prev) return prev;
+          const currentFollowing = (prev.following || []).map((id) => (id._id || id).toString());
+          let updatedFollowing;
+          if (isFollowing) {
+            updatedFollowing = [...new Set([...currentFollowing, actualTargetId])];
+          } else {
+            updatedFollowing = currentFollowing.filter((id) => id !== actualTargetId);
+          }
+          const merged = {
+            ...prev,
+            following: updatedFollowing,
+            followingCount: updatedFollowing.length,
+          };
+          AsyncStorage.setItem('taskplanet_mobile_user', JSON.stringify(merged));
+          return merged;
+        });
+      }
+      return res;
+    } catch (err) {
+      throw err;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -86,6 +122,7 @@ export const AuthProvider = ({ children }) => {
         signup,
         logout,
         updateUser,
+        toggleFollowUser,
       }}
     >
       {children}

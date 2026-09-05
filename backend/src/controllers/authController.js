@@ -1,17 +1,22 @@
-import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
+import { generateToken } from '../utils/jwt.js';
+import logger from '../utils/logger.js';
 
-const generateToken = (id) => {
-  return jwt.sign(
-    { id },
-    process.env.JWT_SECRET || 'taskplanet_super_secret_jwt_key_2026',
-    { expiresIn: '30d' }
-  );
-};
+export const formatUserResponse = (user) => ({
+  _id: user._id,
+  name: user.name,
+  username: user.username,
+  email: user.email,
+  avatar: user.avatar,
+  bio: user.bio,
+  following: user.following || [],
+  followers: user.followers || [],
+  followersCount: user.followers ? user.followers.length : 0,
+  followingCount: user.following ? user.following.length : 0,
+  createdAt: user.createdAt,
+});
 
-// @desc    Register a new user
-// @route   POST /api/auth/signup
-// @access  Public
+// Register a new user
 export const signup = async (req, res) => {
   try {
     const { name, username, email, password, avatar, bio } = req.body;
@@ -23,8 +28,14 @@ export const signup = async (req, res) => {
       });
     }
 
-    // Check if email already exists
-    const emailExists = await User.findOne({ email: email.toLowerCase().trim() });
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedUsername = username.toLowerCase().trim();
+
+    const [emailExists, usernameExists] = await Promise.all([
+      User.findOne({ email: normalizedEmail }),
+      User.findOne({ username: normalizedUsername }),
+    ]);
+
     if (emailExists) {
       return res.status(400).json({
         success: false,
@@ -32,8 +43,6 @@ export const signup = async (req, res) => {
       });
     }
 
-    // Check if username already exists
-    const usernameExists = await User.findOne({ username: username.toLowerCase().trim() });
     if (usernameExists) {
       return res.status(400).json({
         success: false,
@@ -43,43 +52,33 @@ export const signup = async (req, res) => {
 
     const user = await User.create({
       name: name.trim(),
-      username: username.toLowerCase().trim(),
-      email: email.toLowerCase().trim(),
+      username: normalizedUsername,
+      email: normalizedEmail,
       password,
-      avatar: avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username.trim()}`,
+      avatar: avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${normalizedUsername}`,
       bio: bio ? bio.trim() : '',
     });
 
     const token = generateToken(user._id);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
-        user: {
-          _id: user._id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          avatar: user.avatar,
-          bio: user.bio,
-          createdAt: user.createdAt,
-        },
+        user: formatUserResponse(user),
         token,
       },
     });
   } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({
+    logger.error({ err: error }, 'Signup error');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Server error during signup',
     });
   }
 };
 
-// @desc    Authenticate user & get token
-// @route   POST /api/auth/login
-// @access  Public
+// Authenticate user credentials & issue JWT
 export const login = async (req, res) => {
   try {
     const { loginIdentifier, email, username, password } = req.body;
@@ -92,7 +91,6 @@ export const login = async (req, res) => {
       });
     }
 
-    // Find by email or username
     const user = await User.findOne({
       $or: [{ email: identifier }, { username: identifier }],
     }).select('+password');
@@ -114,45 +112,36 @@ export const login = async (req, res) => {
 
     const token = generateToken(user._id);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Login successful',
       data: {
-        user: {
-          _id: user._id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          avatar: user.avatar,
-          bio: user.bio,
-          createdAt: user.createdAt,
-        },
+        user: formatUserResponse(user),
         token,
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
+    logger.error({ err: error }, 'Login error');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Server error during login',
     });
   }
 };
 
-// @desc    Get current logged in user
-// @route   GET /api/auth/me
-// @access  Private
+// Get profile of authenticated user
 export const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         user,
       },
     });
   } catch (error) {
-    res.status(500).json({
+    logger.error({ err: error }, 'Error fetching authenticated user');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Error fetching user profile',
     });

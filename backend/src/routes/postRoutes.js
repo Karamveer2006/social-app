@@ -10,6 +10,7 @@ import {
 } from '../controllers/postController.js';
 import { protect, optionalProtect } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
+import { validateCreatePost, validateComment } from '../middleware/validatorMiddleware.js';
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ const router = express.Router();
 router.get('/', optionalProtect, getFeed);
 
 // Create a post (accepts text, optional single image upload, or both)
-router.post('/', protect, upload.single('image'), createPost);
+router.post('/', protect, upload.single('image'), validateCreatePost, createPost);
 
 // Specific post details
 router.get('/:id', optionalProtect, getPostById);
@@ -29,7 +30,7 @@ router.get('/:id/likes', getPostLikes);
 router.put('/:id/like', protect, toggleLike);
 
 // Add comment to post
-router.post('/:id/comment', protect, addComment);
+router.post('/:id/comment', protect, validateComment, addComment);
 
 // Delete post (author only)
 router.delete('/:id', protect, deletePost);

@@ -12,6 +12,8 @@ import {
   Menu,
   MenuItem,
   Tooltip,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
@@ -27,18 +29,41 @@ import { LikesModal } from './LikesModal';
 
 dayjs.extend(relativeTime);
 
-export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => {
+export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost, onToggleFollow }) => {
   const { user, isAuthenticated } = useAuth();
   const [showComments, setShowComments] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'info' });
 
   const isLiked = post.isLikedByMe;
-  const isAuthor = user && post.author?.userId && (user._id === post.author.userId);
+  const isAuthor =
+    user &&
+    ((post.author?.userId &&
+      (user._id || '').toString() === (post.author.userId || '').toString()) ||
+      (user.username &&
+        post.author?.username &&
+        user.username.toLowerCase() === post.author.username.toLowerCase()));
+
+  const isFollowing =
+    post.isFollowingAuthor ||
+    (user?.following &&
+      post.author?.userId &&
+      user.following.some((id) => (id._id || id).toString() === post.author.userId.toString()));
+
+  const handleFollowClick = () => {
+    if (!isAuthenticated) {
+      setToast({ open: true, message: 'Please log in to follow creators.', severity: 'warning' });
+      return;
+    }
+    if (onToggleFollow && post.author?.userId) {
+      onToggleFollow(post.author.userId, post.author.username);
+    }
+  };
 
   const handleLikeClick = () => {
     if (!isAuthenticated) {
-      alert('Please log in to like posts!');
+      setToast({ open: true, message: 'Please log in to like posts.', severity: 'warning' });
       return;
     }
     onToggleLike(post._id);
@@ -82,6 +107,22 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
                 </MenuItem>
               </Menu>
             </>
+          ) : onToggleFollow && post.author?.userId ? (
+            <Button
+              size="small"
+              variant={isFollowing ? 'outlined' : 'contained'}
+              onClick={handleFollowClick}
+              sx={{
+                borderRadius: 20,
+                fontSize: '0.75rem',
+                textTransform: 'none',
+                fontWeight: 700,
+                px: 1.8,
+                py: 0.3,
+              }}
+            >
+              {isFollowing ? 'Following' : '+ Follow'}
+            </Button>
           ) : null
         }
         title={
@@ -159,7 +200,7 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
                 onClick={handleLikeClick}
                 size="small"
                 sx={{
-                  color: isLiked ? '#EF4444' : '#64748B',
+                  color: isLiked ? 'error.main' : 'text.secondary',
                   transition: 'transform 0.15s ease',
                   '&:active': { transform: 'scale(1.25)' },
                 }}
@@ -177,7 +218,7 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
               sx={{
                 p: 0.5,
                 minWidth: 'auto',
-                color: isLiked ? '#EF4444' : 'text.secondary',
+                color: isLiked ? 'error.main' : 'text.secondary',
                 fontWeight: 600,
                 fontSize: '0.85rem',
                 textTransform: 'none',
@@ -194,7 +235,7 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
               <IconButton
                 onClick={() => setShowComments(!showComments)}
                 size="small"
-                sx={{ color: showComments ? 'primary.main' : '#64748B' }}
+                sx={{ color: showComments ? 'primary.main' : 'text.secondary' }}
               >
                 <ChatBubbleOutlinedIcon sx={{ fontSize: 21 }} />
               </IconButton>
@@ -235,6 +276,23 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
         onClose={() => setShowLikesModal(false)}
         likes={post.likes || []}
       />
+
+      {/* Non-intrusive feedback toast */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Card>
   );
 };

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { User } from '../models/User.js';
 import { Post } from '../models/Post.js';
 import { connectDB, disconnectDB } from '../config/db.js';
+import logger from './logger.js';
 
 dotenv.config();
 
@@ -46,18 +47,18 @@ export const seedDatabase = async () => {
     if (mongoose.connection.readyState !== 1) {
       await connectDB();
     }
-    console.log('🧹 Clearing existing users and posts...');
+    logger.info('Clearing existing users and posts...');
     await User.deleteMany({});
     await Post.deleteMany({});
 
-    console.log('👥 Creating sample users...');
+    logger.info('Creating sample users...');
     const createdUsers = [];
     for (const u of sampleUsers) {
       const created = await User.create(u);
       createdUsers.push(created);
     }
 
-    console.log('📝 Creating sample posts...');
+    logger.info('Creating sample posts...');
     const postsData = [
       {
         author: {
@@ -191,13 +192,13 @@ export const seedDatabase = async () => {
       await post.save();
     }
 
-    console.log('✅ Seed data successfully inserted into MongoDB!');
+    logger.info('Seed data successfully inserted into MongoDB');
     const collections = await mongoose.connection.db.listCollections().toArray();
-    console.log(`📊 Active MongoDB Collections (${collections.length}):`, collections.map(c => c.name));
+    logger.info({ collections: collections.map((c) => c.name) }, 'Active MongoDB collections');
 
     return { users: createdUsers, posts: postsData };
   } catch (error) {
-    console.error('❌ Seeding error:', error);
+    logger.error({ err: error }, 'Seeding error');
     throw error;
   }
 };
@@ -210,7 +211,7 @@ if (process.argv[1].endsWith('seed.js')) {
       process.exit(0);
     })
     .catch((err) => {
-      console.error(err);
+      logger.fatal({ err }, 'Seed script failed');
       process.exit(1);
     });
 }

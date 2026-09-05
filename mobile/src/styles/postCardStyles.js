@@ -1,0 +1,288 @@
+import { StyleSheet } from 'react-native';
+
+export const getPostCardStyles = (colors, isDark) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      marginHorizontal: 16,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: isDark ? 0.35 : 0.04,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+    },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    authorTouchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    authorInfo: {
+      marginLeft: 12,
+      flex: 1,
+    },
+    headerFollowBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      marginLeft: 8,
+    },
+    headerFollowBtnActive: {
+      backgroundColor: colors.primary,
+    },
+    headerFollowingBtn: {
+      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    headerFollowBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    headerFollowBtnActiveText: {
+      color: '#FFFFFF',
+    },
+    headerFollowingBtnText: {
+      color: colors.primary,
+    },
+    authorName: {
+      fontWeight: '700',
+      fontSize: 15,
+      color: colors.text,
+    },
+    authorUsername: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    deleteText: {
+      color: colors.heart,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    content: {
+      paddingHorizontal: 14,
+      paddingBottom: 10,
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.text,
+    },
+    postImage: {
+      width: '100%',
+      height: 240,
+      backgroundColor: isDark ? '#0B0F19' : '#F8FAFC',
+    },
+    actionBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      gap: 20,
+    },
+    actionGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    actionBtn: {
+      padding: 2,
+    },
+    actionIcon: {
+      fontSize: 18,
+    },
+    likedIcon: {
+      transform: [{ scale: 1.1 }],
+    },
+    actionCount: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    likedText: {
+      color: colors.heart,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 18,
+      maxHeight: '80%',
+      minHeight: '40%',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modalContentSmall: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      marginHorizontal: 24,
+      marginVertical: 'auto',
+      padding: 18,
+      maxHeight: 380,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 14,
+      paddingBottom: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    modalTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    closeBtn: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      padding: 4,
+    },
+    commentItem: {
+      flexDirection: 'row',
+      marginBottom: 12,
+    },
+    commentAvatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      marginRight: 10,
+    },
+    commentBody: {
+      flex: 1,
+      backgroundColor: isDark ? colors.inputBg : '#F8FAFC',
+      borderRadius: 14,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    commentMeta: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 3,
+    },
+    commentUser: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    commentTime: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+    replyingToHeaderLabel: {
+      fontSize: 11,
+      color: colors.primary,
+      fontWeight: '600',
+      marginBottom: 3,
+    },
+    commentText: {
+      fontSize: 13,
+      color: colors.text,
+      lineHeight: 18,
+    },
+    replyActionBtn: {
+      marginTop: 6,
+      alignSelf: 'flex-start',
+    },
+    replyActionText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    replyingBanner: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      marginBottom: 6,
+    },
+    replyingBannerText: {
+      fontSize: 12,
+      color: colors.primary,
+    },
+    cancelReplyText: {
+      fontSize: 12,
+      color: colors.heart,
+      fontWeight: '700',
+    },
+    likeItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    emptyText: {
+      textAlign: 'center',
+      color: colors.textSecondary,
+      fontSize: 13,
+      marginVertical: 20,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 10,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.inputBg,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      fontSize: 14,
+      color: colors.text,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    sendBtn: {
+      marginLeft: 10,
+      backgroundColor: colors.primary,
+      borderRadius: 18,
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+    },
+    sendText: {
+      color: '#fff',
+      fontWeight: '700',
+      fontSize: 13,
+    },
+    loginHint: {
+      textAlign: 'center',
+      color: colors.textSecondary,
+      fontSize: 12,
+      paddingTop: 10,
+    },
+  });
+
+export default getPostCardStyles;

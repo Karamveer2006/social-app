@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,13 @@ import {
 import { PostCard } from '../components/PostCard';
 import { postsAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 export const FeedScreen = ({ navigation }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, toggleFollowUser } = useAuth();
+  const { colors, isDarkMode, toggleTheme } = useTheme();
+  const styles = useMemo(() => getStyles(colors, isDarkMode), [colors, isDarkMode]);
+
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -116,8 +119,8 @@ export const FeedScreen = ({ navigation }) => {
     }
   };
 
-  // Optimistic Comment Handler
-  const handleAddComment = async (postId, text) => {
+  // Optimistic Comment & Reply Handler
+  const handleAddComment = async (postId, text, replyTo = '') => {
     if (!user) return;
     const tempComment = {
       _id: `temp-${Date.now()}`,
@@ -126,6 +129,7 @@ export const FeedScreen = ({ navigation }) => {
       name: user.name,
       avatar: user.avatar,
       text,
+      replyTo: replyTo || null,
       createdAt: new Date().toISOString(),
     };
 
@@ -144,7 +148,7 @@ export const FeedScreen = ({ navigation }) => {
     );
 
     try {
-      const res = await postsAPI.addComment(postId, text);
+      const res = await postsAPI.addComment(postId, text, replyTo);
       if (res.success && res.data) {
         setPosts((prev) =>
           prev.map((p) =>
@@ -173,32 +177,95 @@ export const FeedScreen = ({ navigation }) => {
     }
   };
 
+  // Follow / Unfollow Author Handler
+  const handleToggleFollow = async (targetUserId, targetUsername) => {
+    if (!isAuthenticated) {
+      navigation.navigate('Login');
+      return;
+    }
+
+    const isPostFromAuthor = (p) =>
+      (targetUserId &&
+        (p.author?.userId?.toString() === targetUserId?.toString() ||
+          p.author?._id?.toString() === targetUserId?.toString())) ||
+      (targetUsername &&
+        p.author?.username?.toLowerCase() === targetUsername?.toLowerCase());
+
+    const firstPost = posts.find(isPostFromAuthor);
+    const currentlyFollowing = firstPost ? !!firstPost.isFollowingAuthor : false;
+    const nextFollowing = !currentlyFollowing;
+
+    // Optimistically update all posts from this author in the feed
+    setPosts((prev) =>
+      prev.map((p) =>
+        isPostFromAuthor(p) ? { ...p, isFollowingAuthor: nextFollowing } : p
+      )
+    );
+
+    try {
+      const res = await toggleFollowUser(targetUserId || targetUsername);
+      if (res.success && res.data) {
+        setPosts((prev) =>
+          prev.map((p) =>
+            isPostFromAuthor(p)
+              ? { ...p, isFollowingAuthor: res.data.isFollowing }
+              : p
+          )
+        );
+      }
+    } catch (err) {
+      // Revert optimistic update
+      setPosts((prev) =>
+        prev.map((p) =>
+          isPostFromAuthor(p)
+            ? { ...p, isFollowingAuthor: currentlyFollowing }
+            : p
+        )
+      );
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
-      {/* Header */}
+      {/* Header matching web navbar */}
       <View style={styles.navBar}>
-        <View>
-          <Text style={styles.brandTitle}>TaskPlanet</Text>
-          <Text style={styles.brandSubtitle}>SOCIAL COMMUNITY</Text>
+        <View style={styles.brandGroup}>
+          <Text style={styles.planetIcon}>🪐</Text>
+          <View>
+            <Text style={styles.brandTitle}>TaskPlanet</Text>
+            <Text style={styles.brandSubtitle}>SOCIAL COMMUNITY</Text>
+          </View>
         </View>
 
-        {isAuthenticated ? (
+        <View style={styles.headerActions}>
+          {/* Dark / Light Mode Toggle Button */}
           <TouchableOpacity
-            style={styles.createBtn}
-            onPress={() => navigation.navigate('Create')}
+            style={styles.themeToggleBtn}
+            onPress={toggleTheme}
+            activeOpacity={0.7}
+            accessibilityLabel="Toggle dark mode"
           >
-            <Text style={styles.createBtnText}>+ Post</Text>
+            <Text style={styles.themeToggleIcon}>{isDarkMode ? '☀️' : '🌙'}</Text>
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.loginHeaderBtn}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <Text style={styles.loginHeaderText}>Log In</Text>
-          </TouchableOpacity>
-        )}
+
+          {isAuthenticated ? (
+            <TouchableOpacity
+              style={styles.createBtn}
+              onPress={() => navigation.navigate('Create')}
+            >
+              <Text style={styles.createBtnText}>+ Post</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.loginHeaderBtn}
+              onPress={() => navigation.navigate('Login')}
+            >
+              <Text style={styles.loginHeaderText}>Log In</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Feed list */}
@@ -217,17 +284,49 @@ export const FeedScreen = ({ navigation }) => {
               onToggleLike={handleToggleLike}
               onAddComment={handleAddComment}
               onDeletePost={handleDeletePost}
+              onToggleFollow={handleToggleFollow}
+              onPressAuthor={(username) => navigation.navigate('UserProfile', { username })}
             />
           )}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
+              tintColor={colors.primary}
               colors={[colors.primary]}
             />
           }
           onEndReached={onEndReached}
-          onEndReachedThreshold={0.5}
+          ListEmptyComponent={
+            !loading && (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconCircle}>
+                  <Text style={styles.emptyPlanet}>🪐</Text>
+                </View>
+                <Text style={styles.emptyTitle}>No posts yet</Text>
+                <Text style={styles.emptySubtitle}>
+                  Be the first one to share an update or photo with the community!
+                </Text>
+                {isAuthenticated ? (
+                  <TouchableOpacity
+                    style={styles.emptyActionBtn}
+                    onPress={() => navigation.navigate('Create')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.emptyActionBtnText}>+ Create First Post</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.emptyActionBtn}
+                    onPress={() => navigation.navigate('Login')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.emptyActionBtnText}>Log In to Post</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )
+          }
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator
@@ -237,70 +336,154 @@ export const FeedScreen = ({ navigation }) => {
               />
             ) : null
           }
-          contentContainerStyle={{ paddingTop: 10, paddingBottom: 24 }}
+          contentContainerStyle={{ paddingTop: 10, paddingBottom: 24, flexGrow: 1 }}
         />
       )}
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  brandTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  brandSubtitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: 1.2,
-  },
-  createBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-  },
-  createBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  loginHeaderBtn: {
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  loginHeaderText: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: colors.textSecondary,
-    fontSize: 14,
-  },
-});
+const getStyles = (colors, isDark) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    navBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    brandGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    planetIcon: {
+      fontSize: 24,
+    },
+    brandTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -0.3,
+    },
+    brandSubtitle: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: colors.primary,
+      letterSpacing: 1,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    themeToggleBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    themeToggleIcon: {
+      fontSize: 16,
+    },
+    createBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    createBtnText: {
+      color: '#FFFFFF',
+      fontWeight: '700',
+      fontSize: 13,
+    },
+    loginHeaderBtn: {
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#EFF6FF',
+    },
+    loginHeaderText: {
+      color: colors.primary,
+      fontWeight: '700',
+      fontSize: 13,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 12,
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 48,
+      paddingHorizontal: 24,
+      marginHorizontal: 16,
+      marginTop: 24,
+      borderRadius: 16,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+    },
+    emptyIconCircle: {
+      width: 58,
+      height: 58,
+      borderRadius: 29,
+      backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+    },
+    emptyPlanet: {
+      fontSize: 26,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+      marginBottom: 6,
+    },
+    emptySubtitle: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 19,
+      marginBottom: 18,
+      maxWidth: 260,
+    },
+    emptyActionBtn: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 11,
+      borderRadius: 12,
+      shadowColor: '#2563EB',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.25,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    emptyActionBtnText: {
+      color: '#FFFFFF',
+      fontWeight: '800',
+      fontSize: 14,
+    },
+  });

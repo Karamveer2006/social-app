@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { FeedPage } from './pages/FeedPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { LoginPage } from './pages/LoginPage';
@@ -24,16 +25,18 @@ export function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<FeedPage />} />
-            <Route path="/profile/:username" element={<ProfilePage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+        <ErrorBoundary>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<FeedPage />} />
+              <Route path="/profile/:username" element={<ProfilePage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </ErrorBoundary>
       </AuthProvider>
     </ThemeProvider>
   );

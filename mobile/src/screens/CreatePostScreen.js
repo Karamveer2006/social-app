@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,18 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  StatusBar,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { postsAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 export const CreatePostScreen = ({ navigation }) => {
   const { isAuthenticated } = useAuth();
+  const { colors, isDarkMode } = useTheme();
+  const styles = useMemo(() => getStyles(colors, isDarkMode), [colors, isDarkMode]);
+
   const [content, setContent] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
@@ -94,6 +98,7 @@ export const CreatePostScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Create New Post</Text>
         <Text style={styles.subtitle}>
@@ -163,105 +168,108 @@ export const CreatePostScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 18,
-  },
-  textArea: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 16,
-    fontSize: 15,
-    color: colors.text,
-    minHeight: 140,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 16,
-  },
-  previewContainer: {
-    position: 'relative',
-    borderRadius: 14,
-    overflow: 'hidden',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  previewImage: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#F8FAFC',
-  },
-  removeBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  secondaryBtn: {
-    backgroundColor: '#E0E7FF',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  secondaryBtnText: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  urlInput: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 20,
-  },
-  submitBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  submitBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-});
+const getStyles = (colors, isDark) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    title: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginBottom: 18,
+    },
+    textArea: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 16,
+      fontSize: 15,
+      color: colors.text,
+      minHeight: 140,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 16,
+    },
+    previewContainer: {
+      position: 'relative',
+      borderRadius: 14,
+      overflow: 'hidden',
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    previewImage: {
+      width: '100%',
+      height: 200,
+      backgroundColor: isDark ? '#0B0F19' : '#F8FAFC',
+    },
+    removeBtn: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    removeBtnText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 12,
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      marginBottom: 12,
+    },
+    secondaryBtn: {
+      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#E0E7FF',
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: colors.primary,
+    },
+    secondaryBtnText: {
+      color: colors.primary,
+      fontWeight: '700',
+      fontSize: 14,
+    },
+    urlInput: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 13,
+      color: colors.text,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 20,
+    },
+    submitBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    submitBtnText: {
+      color: '#fff',
+      fontWeight: '700',
+      fontSize: 16,
+    },
+  });

@@ -1,38 +1,49 @@
 import { Post } from '../models/Post.js';
+import { uploadMedia } from '../config/cloudinary.js';
+import logger from '../utils/logger.js';
 
-// @desc    Get all posts for public feed (with pagination)
-// @route   GET /api/posts
-// @access  Public
+// Retrieve paginated public feed
 export const getFeed = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (page - 1) * limit;
 
-    const totalPosts = await Post.countDocuments();
-    const posts = await Post.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const [totalPosts, posts] = await Promise.all([
+      Post.countDocuments(),
+      Post.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
 
-    const currentUserId = req.user ? req.user._id.toString() : null;
+    const currentUser = req.user;
+    const currentUserId = currentUser ? currentUser._id.toString() : null;
+    const followingIds = currentUser?.following
+      ? currentUser.following.map((id) => id.toString())
+      : [];
 
-    // Enhance posts with isLikedByMe flag for convenience
     const formattedPosts = posts.map((post) => {
       const isLikedByMe = currentUserId
         ? post.likes.some((like) => like.userId.toString() === currentUserId)
         : false;
 
+      const isFollowingAuthor =
+        currentUserId && post.author?.userId
+          ? followingIds.includes(post.author.userId.toString())
+          : false;
+
       return {
         ...post,
         isLikedByMe,
+        isFollowingAuthor,
         likesCount: post.likes ? post.likes.length : 0,
         commentsCount: post.comments ? post.comments.length : 0,
       };
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         posts: formattedPosts,
@@ -46,17 +57,15 @@ export const getFeed = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error in getFeed:', error);
-    res.status(500).json({
+    logger.error({ err: error }, 'Error fetching public feed');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Error fetching feed',
     });
   }
 };
 
-// @desc    Get a single post by ID
-// @route   GET /api/posts/:id
-// @access  Public
+// Retrieve a single post by ID
 export const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).lean();
@@ -67,47 +76,48 @@ export const getPostById = async (req, res) => {
       });
     }
 
-    const currentUserId = req.user ? req.user._id.toString() : null;
+    const currentUser = req.user;
+    const currentUserId = currentUser ? currentUser._id.toString() : null;
     const isLikedByMe = currentUserId
       ? post.likes.some((like) => like.userId.toString() === currentUserId)
       : false;
+    const isFollowingAuthor =
+      currentUserId && post.author?.userId && currentUser?.following
+        ? currentUser.following.some((id) => id.toString() === post.author.userId.toString())
+        : false;
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         post: {
           ...post,
           isLikedByMe,
+          isFollowingAuthor,
         },
       },
     });
   } catch (error) {
-    res.status(500).json({
+    logger.error({ err: error, id: req.params.id }, 'Error fetching post');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Error fetching post',
     });
   }
 };
 
-// @desc    Create a new post (text, image, or both)
-// @route   POST /api/posts
-// @access  Private
+// Create a new post (text, image, or both)
 export const createPost = async (req, res) => {
   try {
     const { content } = req.body;
     let imageUrl = req.body.imageUrl || '';
 
-    // If file was uploaded via multer, set the image URL
     if (req.file) {
-      // Create server-relative URL
-      const host = req.get('host');
-      const protocol = req.protocol;
-      imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+      const uploadResult = await uploadMedia(req.file, 'taskplanet/posts', req);
+      imageUrl = uploadResult.url;
     }
 
-    // Validation: at least content or imageUrl must exist
-    const hasContent = content && content.trim().length > 0;
-    const hasImage = imageUrl && imageUrl.trim().length > 0;
+    const hasContent = Boolean(content && content.trim().length > 0);
+    const hasImage = Boolean(imageUrl && imageUrl.trim().length > 0);
 
     if (!hasContent && !hasImage) {
       return res.status(400).json({
@@ -131,7 +141,7 @@ export const createPost = async (req, res) => {
       commentsCount: 0,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Post created successfully',
       data: {
@@ -142,17 +152,15 @@ export const createPost = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error creating post:', error);
-    res.status(500).json({
+    logger.error({ err: error }, 'Error creating post');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Error creating post',
     });
   }
 };
 
-// @desc    Toggle like on a post (Like / Unlike)
-// @route   PUT /api/posts/:id/like
-// @access  Private
+// Toggle like / unlike on a post
 export const toggleLike = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -171,11 +179,9 @@ export const toggleLike = async (req, res) => {
     let isLikedByMe = false;
 
     if (existingLikeIndex > -1) {
-      // User already liked -> unlike
       post.likes.splice(existingLikeIndex, 1);
       isLikedByMe = false;
     } else {
-      // Add like with user details
       post.likes.push({
         userId: req.user._id,
         username: req.user.username,
@@ -189,7 +195,7 @@ export const toggleLike = async (req, res) => {
     post.likesCount = post.likes.length;
     await post.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: isLikedByMe ? 'Post liked' : 'Post unliked',
       data: {
@@ -200,20 +206,18 @@ export const toggleLike = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error toggling like:', error);
-    res.status(500).json({
+    logger.error({ err: error, id: req.params.id }, 'Error toggling like');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Error toggling like',
     });
   }
 };
 
-// @desc    Add a comment to a post
-// @route   POST /api/posts/:id/comment
-// @access  Private
+// Add a comment to a post
 export const addComment = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, replyTo } = req.body;
 
     if (!text || text.trim().length === 0) {
       return res.status(400).json({
@@ -236,7 +240,7 @@ export const addComment = async (req, res) => {
       name: req.user.name,
       avatar: req.user.avatar,
       text: text.trim(),
-      replyTo: req.body.replyTo ? req.body.replyTo.trim() : '',
+      replyTo: replyTo ? replyTo.trim() : '',
       createdAt: new Date(),
     };
 
@@ -246,7 +250,7 @@ export const addComment = async (req, res) => {
 
     const addedComment = post.comments[post.comments.length - 1];
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Comment added successfully',
       data: {
@@ -257,17 +261,15 @@ export const addComment = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error adding comment:', error);
-    res.status(500).json({
+    logger.error({ err: error, id: req.params.id }, 'Error adding comment');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Error adding comment',
     });
   }
 };
 
-// @desc    Get list of all users who liked a post
-// @route   GET /api/posts/:id/likes
-// @access  Public
+// Retrieve list of users who liked a post
 export const getPostLikes = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).select('likes likesCount');
@@ -278,7 +280,7 @@ export const getPostLikes = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         postId: post._id,
@@ -287,16 +289,15 @@ export const getPostLikes = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({
+    logger.error({ err: error, id: req.params.id }, 'Error fetching likes');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Error fetching likes',
     });
   }
 };
 
-// @desc    Delete post (author only)
-// @route   DELETE /api/posts/:id
-// @access  Private
+// Delete a post (author only)
 export const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -307,7 +308,6 @@ export const deletePost = async (req, res) => {
       });
     }
 
-    // Check ownership
     if (post.author.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
@@ -317,13 +317,14 @@ export const deletePost = async (req, res) => {
 
     await Post.findByIdAndDelete(req.params.id);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Post deleted successfully',
       data: { postId: req.params.id },
     });
   } catch (error) {
-    res.status(500).json({
+    logger.error({ err: error, id: req.params.id }, 'Error deleting post');
+    return res.status(500).json({
       success: false,
       message: error.message || 'Error deleting post',
     });

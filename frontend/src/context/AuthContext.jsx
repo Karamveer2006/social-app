@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../api/client';
+import { authAPI, usersAPI } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -70,6 +70,40 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
   };
 
+  const updateUser = (updatedUserData) => {
+    setUser((prev) => {
+      const merged = { ...prev, ...updatedUserData };
+      localStorage.setItem('taskplanet_user', JSON.stringify(merged));
+      return merged;
+    });
+  };
+
+  const toggleFollowUser = async (targetUserId) => {
+    const res = await usersAPI.toggleFollow(targetUserId);
+    if (res.success && res.data) {
+      const isFollowing = res.data.isFollowing;
+      const actualTargetId = (res.data.targetUserId || targetUserId).toString();
+      setUser((prev) => {
+        if (!prev) return prev;
+        const currentFollowing = (prev.following || []).map((id) => (id._id || id).toString());
+        let updatedFollowing;
+        if (isFollowing) {
+          updatedFollowing = [...new Set([...currentFollowing, actualTargetId])];
+        } else {
+          updatedFollowing = currentFollowing.filter((id) => id !== actualTargetId);
+        }
+        const merged = {
+          ...prev,
+          following: updatedFollowing,
+          followingCount: updatedFollowing.length,
+        };
+        localStorage.setItem('taskplanet_user', JSON.stringify(merged));
+        return merged;
+      });
+    }
+    return res;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -80,6 +114,8 @@ export const AuthProvider = ({ children }) => {
         login,
         signup,
         logout,
+        updateUser,
+        toggleFollowUser,
       }}
     >
       {children}

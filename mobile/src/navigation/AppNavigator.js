@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -9,7 +9,7 @@ import { CreatePostScreen } from '../screens/CreatePostScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignupScreen } from '../screens/SignupScreen';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -19,13 +19,22 @@ const CreateIcon = ({ color }) => <Text style={[styles.tabIcon, { color }]}>➕<
 const ProfileIcon = ({ color }) => <Text style={[styles.tabIcon, { color }]}>👤</Text>;
 
 function BottomTabs() {
+  const { colors, isDarkMode } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            backgroundColor: colors.card,
+            borderTopColor: colors.border,
+            borderTopWidth: 1,
+          },
+        ],
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
@@ -58,10 +67,25 @@ function BottomTabs() {
 }
 
 export function AppNavigator() {
+  const { isDarkMode, colors } = useTheme();
+
+  const customNavTheme = {
+    ...(isDarkMode ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDarkMode ? DarkTheme.colors : DefaultTheme.colors),
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: colors.border,
+      primary: colors.primary,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={customNavTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={BottomTabs} />
+        <Stack.Screen name="UserProfile" component={ProfileScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Signup" component={SignupScreen} />
       </Stack.Navigator>
@@ -71,9 +95,7 @@ export function AppNavigator() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.card,
-    borderTopColor: colors.border,
-    height: 60,
+    height: 62,
     paddingBottom: 8,
     paddingTop: 6,
   },

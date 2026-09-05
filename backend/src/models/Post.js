@@ -114,14 +114,13 @@ const postSchema = new mongoose.Schema(
 
 // Validation: At least one of content or imageUrl must be provided!
 postSchema.pre('validate', function (next) {
-  const hasContent = this.content && this.content.trim().length > 0;
-  const hasImage = this.imageUrl && this.imageUrl.trim().length > 0;
+  const hasContent = Boolean(this.content && this.content.trim().length > 0);
+  const hasImage = Boolean(this.imageUrl && this.imageUrl.trim().length > 0);
 
   if (!hasContent && !hasImage) {
     this.invalidate('content', 'A post must contain either text, an image, or both.');
-  } else {
-    next();
   }
+  next();
 });
 
 // Synchronize likesCount and commentsCount before saving

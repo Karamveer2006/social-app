@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import { verifyToken } from '../utils/jwt.js';
 import { User } from '../models/User.js';
 
 export const protect = async (req, res, next) => {
@@ -10,7 +10,7 @@ export const protect = async (req, res, next) => {
   ) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'taskplanet_super_secret_jwt_key_2026');
+      const decoded = verifyToken(token);
       
       const user = await User.findById(decoded.id).select('-password');
       if (!user) {
@@ -46,7 +46,7 @@ export const optionalProtect = async (req, res, next) => {
   ) {
     try {
       const token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'taskplanet_super_secret_jwt_key_2026');
+      const decoded = verifyToken(token);
       req.user = await User.findById(decoded.id).select('-password');
     } catch (err) {
       // Ignore token failure for public routes
@@ -55,3 +55,4 @@ export const optionalProtect = async (req, res, next) => {
   }
   next();
 };
+

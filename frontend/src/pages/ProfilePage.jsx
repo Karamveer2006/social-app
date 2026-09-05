@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useRef } from 'react';
 import {
   Container,
   Box,
@@ -13,235 +13,65 @@ import {
   DialogActions,
   TextField,
   CircularProgress,
-  Alert,
   Divider,
-  Grid,
-  Chip,
+  IconButton,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Navbar } from '../components/Navbar';
 import { PostCard } from '../components/PostCard';
 import { MobileBottomNav } from '../components/MobileBottomNav';
-import { usersAPI, postsAPI } from '../api/client';
+import { useProfile } from '../hooks/useProfile';
 import { useAuth } from '../context/AuthContext';
 
 export const ProfilePage = () => {
   const { username: paramUsername } = useParams();
-  const { user: currentUser, isAuthenticated } = useAuth();
+  const { user: currentUser } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
-  // If no param, view own profile
   const targetUsername = paramUsername || currentUser?.username;
 
-  const [profile, setProfile] = useState(null);
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [followingLoading, setFollowingLoading] = useState(false);
-
-  // Edit profile dialog state
-  const [openEditModal, setOpenEditModal] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editBio, setEditBio] = useState('');
-  const [editAvatar, setEditAvatar] = useState('');
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  const isOwnProfile =
-    currentUser &&
-    profile &&
-    (currentUser._id === profile._id || currentUser.username === profile.username);
-
-  const fetchProfile = useCallback(async () => {
-    if (!targetUsername) return;
-    setLoading(true);
-    setError('');
-    try {
-      const res = await usersAPI.getProfile(targetUsername);
-      if (res.success && res.data) {
-        setProfile(res.data.user);
-        setPosts(res.data.posts);
-        setEditName(res.data.user.name || '');
-        setEditBio(res.data.user.bio || '');
-        setEditAvatar(res.data.user.avatar || '');
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load user profile');
-    } finally {
-      setLoading(false);
-    }
-  }, [targetUsername]);
-
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
-
-  // Handle Follow / Unfollow toggle
-  const handleToggleFollow = async () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    if (!profile) return;
-
-    setFollowingLoading(true);
-    try {
-      const res = await usersAPI.toggleFollow(profile._id);
-      if (res.success && res.data) {
-        setProfile((prev) => ({
-          ...prev,
-          isFollowing: res.data.isFollowing,
-          followersCount: res.data.followersCount,
-        }));
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update follow status');
-    } finally {
-      setFollowingLoading(false);
-    }
-  };
-
-  // Handle Save Profile
-  const handleSaveProfile = async () => {
-    setSavingProfile(true);
-    try {
-      const res = await usersAPI.updateProfile({
-        name: editName,
-        bio: editBio,
-        avatar: editAvatar,
-      });
-      if (res.success && res.data) {
-        setProfile((prev) => ({
-          ...prev,
-          name: res.data.user.name,
-          bio: res.data.user.bio,
-          avatar: res.data.user.avatar,
-        }));
-        setOpenEditModal(false);
-        // Refresh posts with updated author details
-        fetchProfile();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update profile');
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-  // Handle post interactions on profile
-  const handleToggleLike = async (postId) => {
-    if (!currentUser) return;
-    const previousPosts = [...posts];
-
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p._id !== postId) return p;
-        const alreadyLiked = p.isLikedByMe;
-        const count = alreadyLiked ? Math.max(0, (p.likesCount || 0) - 1) : (p.likesCount || 0) + 1;
-        let likes = p.likes ? [...p.likes] : [];
-
-        if (alreadyLiked) {
-          likes = likes.filter((l) => l.userId !== currentUser._id);
-        } else {
-          likes.push({
-            userId: currentUser._id,
-            username: currentUser.username,
-            name: currentUser.name,
-            avatar: currentUser.avatar,
-            likedAt: new Date().toISOString(),
-          });
-        }
-
-        return { ...p, isLikedByMe: !alreadyLiked, likesCount: count, likes };
-      })
-    );
-
-    try {
-      const res = await postsAPI.toggleLike(postId);
-      if (res.success && res.data) {
-        setPosts((prev) =>
-          prev.map((p) =>
-            p._id === postId
-              ? {
-                  ...p,
-                  isLikedByMe: res.data.isLikedByMe,
-                  likesCount: res.data.likesCount,
-                  likes: res.data.likes,
-                }
-              : p
-          )
-        );
-      }
-    } catch (err) {
-      setPosts(previousPosts);
-    }
-  };
-
-  const handleAddComment = async (postId, text, replyTo = '') => {
-    if (!currentUser) return;
-    const optimisticComment = {
-      _id: `temp-${Date.now()}`,
-      userId: currentUser._id,
-      username: currentUser.username,
-      name: currentUser.name,
-      avatar: currentUser.avatar,
-      text,
-      replyTo,
-      createdAt: new Date().toISOString(),
-    };
-
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p._id !== postId) return p;
-        return {
-          ...p,
-          comments: [...(p.comments || []), optimisticComment],
-          commentsCount: (p.commentsCount || 0) + 1,
-        };
-      })
-    );
-
-    try {
-      const res = await postsAPI.addComment(postId, text, replyTo);
-      if (res.success && res.data) {
-        setPosts((prev) =>
-          prev.map((p) =>
-            p._id === postId
-              ? {
-                  ...p,
-                  comments: res.data.comments,
-                  commentsCount: res.data.commentsCount,
-                }
-              : p
-          )
-        );
-      }
-    } catch (err) {
-      fetchProfile();
-      throw err;
-    }
-  };
-
-  const handleDeletePost = async (postId) => {
-    try {
-      await postsAPI.deletePost(postId);
-      setPosts((prev) => prev.filter((p) => p._id !== postId));
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete post');
-    }
-  };
+  const {
+    profile,
+    posts,
+    loading,
+    error,
+    isOwnProfile,
+    followingLoading,
+    openEditModal,
+    setOpenEditModal,
+    editName,
+    setEditName,
+    editBio,
+    setEditBio,
+    editAvatar,
+    setEditAvatar,
+    avatarFile,
+    setAvatarFile,
+    avatarPreview,
+    setAvatarPreview,
+    savingProfile,
+    handleToggleFollow,
+    handleOpenEditModal,
+    handleSaveProfile,
+    handleToggleLike,
+    handleAddComment,
+    handleDeletePost,
+  } = useProfile(targetUsername);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 10 }}>
       <Navbar />
 
       <Container maxWidth="md" sx={{ mt: 3 }}>
-        {/* Back navigation */}
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={() => navigate('/')}
@@ -266,11 +96,9 @@ export const ProfilePage = () => {
               Return Home
             </Button>
           </Card>
-        ) : (
+        ) : profile ? (
           <>
-            {/* User Profile Banner & Details Card */}
             <Card sx={{ mb: 3, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-              {/* Header Gradient Banner */}
               <Box
                 sx={{
                   height: 120,
@@ -304,13 +132,12 @@ export const ProfilePage = () => {
                     {profile.name?.[0]}
                   </Avatar>
 
-                  {/* Actions (Edit Profile OR Follow/Unfollow) */}
                   <Box>
                     {isOwnProfile ? (
                       <Button
                         variant="outlined"
                         startIcon={<EditIcon />}
-                        onClick={() => setOpenEditModal(true)}
+                        onClick={handleOpenEditModal}
                         sx={{ borderRadius: 3, fontWeight: 700 }}
                       >
                         Edit Profile
@@ -330,7 +157,6 @@ export const ProfilePage = () => {
                   </Box>
                 </Box>
 
-                {/* Name, Username & Bio */}
                 <Typography variant="h5" sx={{ fontWeight: 800 }}>
                   {profile.name}
                 </Typography>
@@ -348,7 +174,6 @@ export const ProfilePage = () => {
                   </Typography>
                 )}
 
-                {/* Joined date */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: 'text.secondary', mb: 2.5, fontSize: '0.85rem' }}>
                   <CalendarTodayIcon sx={{ fontSize: 16 }} />
                   <span>Joined {dayjs(profile.createdAt).format('MMMM YYYY')}</span>
@@ -356,7 +181,6 @@ export const ProfilePage = () => {
 
                 <Divider sx={{ my: 2 }} />
 
-                {/* Social Stats Counters */}
                 <Box sx={{ display: 'flex', gap: 4 }}>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.8 }}>
                     <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main' }}>
@@ -388,7 +212,6 @@ export const ProfilePage = () => {
               </CardContent>
             </Card>
 
-            {/* Posts published by this user */}
             <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>
               Posts ({posts.length})
             </Typography>
@@ -411,19 +234,106 @@ export const ProfilePage = () => {
               ))
             )}
           </>
-        )}
+        ) : null}
       </Container>
 
       {/* Edit Profile Modal */}
-      <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openEditModal}
+        onClose={() => setOpenEditModal(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
         <DialogTitle sx={{ fontWeight: 800 }}>Edit Profile</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, my: 1 }}>
+            <Box sx={{ position: 'relative' }}>
+              <Avatar
+                src={avatarPreview || editAvatar || profile?.avatar}
+                alt={editName}
+                sx={{
+                  width: 96,
+                  height: 96,
+                  fontSize: '2rem',
+                  border: '3px solid',
+                  borderColor: 'primary.main',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                }}
+              >
+                {editName?.[0]}
+              </Avatar>
+              <IconButton
+                onClick={() => fileInputRef.current?.click()}
+                sx={{
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
+                  bgcolor: 'primary.main',
+                  color: '#fff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                  width: 36,
+                  height: 36,
+                }}
+                size="small"
+                title="Upload Profile Picture"
+              >
+                <PhotoCameraIcon fontSize="small" />
+              </IconButton>
+            </Box>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setAvatarFile(file);
+                  setAvatarPreview(URL.createObjectURL(file));
+                }
+              }}
+            />
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<PhotoCameraIcon />}
+                onClick={() => fileInputRef.current?.click()}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+              >
+                Choose Photo from Device
+              </Button>
+              {avatarFile && (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mt: 0.8 }}>
+                  <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+                    ✓ {avatarFile.name}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      setAvatarFile(null);
+                      setAvatarPreview('');
+                    }}
+                    title="Remove selected file"
+                  >
+                    <DeleteOutlinedIcon fontSize="small" color="error" />
+                  </IconButton>
+                </Box>
+              )}
+            </Box>
+          </Box>
+
           <TextField
             label="Full Name"
             fullWidth
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
           />
+
           <TextField
             label="Bio (Tell everyone about yourself)"
             fullWidth
@@ -432,15 +342,20 @@ export const ProfilePage = () => {
             value={editBio}
             onChange={(e) => setEditBio(e.target.value)}
           />
+
           <TextField
-            label="Avatar Image Link (URL)"
+            label="Or Image Web Link (URL)"
             fullWidth
+            size="small"
             value={editAvatar}
-            onChange={(e) => setEditAvatar(e.target.value)}
-            helperText="Provide an image web link or leave as Dicebear avatar"
+            onChange={(e) => {
+              setEditAvatar(e.target.value);
+              if (!avatarFile) setAvatarPreview(e.target.value);
+            }}
+            helperText="Upload a file above, or paste an external image link"
           />
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={() => setOpenEditModal(false)} disabled={savingProfile}>
             Cancel
           </Button>
@@ -455,7 +370,6 @@ export const ProfilePage = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Mobile-only Bottom Navigation Bar */}
       <MobileBottomNav />
     </Box>
   );

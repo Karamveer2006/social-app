@@ -73,13 +73,24 @@ export const SignupPage = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: '#F1F5F9',
+        bgcolor: 'background.default',
         py: 4,
         px: 2,
       }}
     >
       <Container maxWidth="xs">
-        <Card sx={{ p: { xs: 2, sm: 3 }, borderRadius: 4, border: '1px solid #E2E8F0' }}>
+        <Card
+          sx={{
+            p: { xs: 2, sm: 3 },
+            borderRadius: 4,
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+            bgcolor: 'background.paper',
+            boxShadow: (theme) =>
+              theme.palette.mode === 'dark'
+                ? '0 8px 32px rgba(0, 0, 0, 0.4)'
+                : '0 8px 30px rgba(0, 0, 0, 0.06)',
+          }}
+        >
           <CardContent sx={{ p: '8px !important' }}>
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <Box
@@ -98,7 +109,7 @@ export const SignupPage = () => {
               >
                 <PublicIcon fontSize="medium" />
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#0F172A' }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary' }}>
                 Join TaskPlanet
               </Typography>
               <Typography variant="body2" color="text.secondary">

@@ -9,8 +9,6 @@ import {
   Box,
   Alert,
   CircularProgress,
-  Divider,
-  Chip,
 } from '@mui/material';
 import PublicIcon from '@mui/icons-material/Public';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -49,11 +47,6 @@ export const LoginPage = () => {
     }
   };
 
-  const handleQuickLogin = (email, pass) => {
-    setIdentifier(email);
-    setPassword(pass);
-  };
-
   return (
     <Box
       sx={{
@@ -61,13 +54,24 @@ export const LoginPage = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: '#F1F5F9',
+        bgcolor: 'background.default',
         py: 4,
         px: 2,
       }}
     >
       <Container maxWidth="xs">
-        <Card sx={{ p: { xs: 2, sm: 3 }, borderRadius: 4, border: '1px solid #E2E8F0' }}>
+        <Card
+          sx={{
+            p: { xs: 2, sm: 3 },
+            borderRadius: 4,
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+            bgcolor: 'background.paper',
+            boxShadow: (theme) =>
+              theme.palette.mode === 'dark'
+                ? '0 8px 32px rgba(0, 0, 0, 0.4)'
+                : '0 8px 30px rgba(0, 0, 0, 0.06)',
+          }}
+        >
           <CardContent sx={{ p: '8px !important' }}>
             {/* Branding Logo */}
             <Box sx={{ textAlign: 'center', mb: 3 }}>
@@ -87,7 +91,7 @@ export const LoginPage = () => {
               >
                 <PublicIcon fontSize="medium" />
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#0F172A' }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary' }}>
                 Welcome Back
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -136,38 +140,6 @@ export const LoginPage = () => {
                 sx={{ mt: 1, py: 1.2, fontWeight: 700 }}
               >
                 {loading ? 'Signing In...' : 'Sign In'}
-              </Button>
-            </Box>
-
-            {/* Quick Demo Logins for Recruiter / Reviewer */}
-            <Divider sx={{ my: 2.5 }}>
-              <Chip label="Quick Demo Accounts" size="small" sx={{ fontSize: '0.75rem', bgcolor: '#F8FAFC' }} />
-            </Divider>
-
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => handleQuickLogin('aarav@example.com', 'Password123!')}
-                sx={{ borderRadius: 2, fontSize: '0.75rem' }}
-              >
-                Aarav
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => handleQuickLogin('priya@example.com', 'Password123!')}
-                sx={{ borderRadius: 2, fontSize: '0.75rem' }}
-              >
-                Priya
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => handleQuickLogin('rohan@example.com', 'Password123!')}
-                sx={{ borderRadius: 2, fontSize: '0.75rem' }}
-              >
-                Rohan
               </Button>
             </Box>
 

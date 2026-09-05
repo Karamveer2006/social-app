@@ -7,6 +7,7 @@ import { connectDB, disconnectDB } from '../src/config/db.js';
 
 test.before(async () => {
   process.env.NODE_ENV = 'test';
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_token_12345';
   await connectDB();
 });
 
@@ -230,4 +231,71 @@ test('API Integration Suite: Auth, Posts, Likes, Comments, and Collection Rule',
     assert.ok(nonSystemCollections.includes('users'));
     assert.ok(nonSystemCollections.includes('posts'));
   });
+
+  await t.test('11. Cloudinary Module & Media Storage Verification', async () => {
+    const { isCloudinaryConfigured, uploadMedia } = await import('../src/config/cloudinary.js');
+    assert.equal(typeof isCloudinaryConfigured(), 'boolean');
+
+    // Test fallback upload logic
+    const mockFile = {
+      filename: 'test-image.png',
+      path: '/tmp/test-image.png',
+      originalname: 'test-image.png',
+      mimetype: 'image/png',
+    };
+    const uploadRes = await uploadMedia(mockFile, 'taskplanet/test');
+    assert.ok(uploadRes.url);
+    assert.ok(uploadRes.provider === 'local' || uploadRes.provider === 'cloudinary');
+
+    // Test health check endpoint reports mediaStorage provider
+    const healthRes = await request(app).get('/api/health');
+    assert.equal(healthRes.status, 200);
+    assert.ok(healthRes.body.mediaStorage);
+    assert.ok(healthRes.body.mediaStorage.provider);
+  });
+
+  await t.test('12. User Profile Post Pagination & Meta', async () => {
+    const profileRes = await request(app)
+      .get('/api/users/tester_' + testUserId) // test fallback or username
+      .query({ page: 1, limit: 2 });
+    // Or query seconduser
+    const secondUserRes = await request(app)
+      .get('/api/users/seconduser')
+      .query({ page: 1, limit: 2 });
+    assert.equal(secondUserRes.status, 200);
+    assert.ok(secondUserRes.body.data.pagination);
+    assert.equal(secondUserRes.body.data.pagination.page, 1);
+    assert.equal(secondUserRes.body.data.pagination.limit, 2);
+  });
+
+  await t.test('13. Validation Middleware (Bad Email, Short Password, Empty Comment)', async () => {
+    // Bad email rejection
+    const badEmailRes = await request(app).post('/api/auth/signup').send({
+      name: 'Bad Email User',
+      username: 'bademailuser',
+      email: 'not-an-email',
+      password: 'password123',
+    });
+    assert.equal(badEmailRes.status, 400);
+    assert.equal(badEmailRes.body.success, false);
+
+    // Short password rejection
+    const shortPassRes = await request(app).post('/api/auth/signup').send({
+      name: 'Short Pass User',
+      username: 'shortpassuser',
+      email: 'shortpass@example.com',
+      password: '123',
+    });
+    assert.equal(shortPassRes.status, 400);
+    assert.equal(shortPassRes.body.success, false);
+
+    // Empty comment rejection
+    const emptyCommentRes = await request(app)
+      .post(`/api/posts/${postId}/comment`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ text: '   ' });
+    assert.equal(emptyCommentRes.status, 400);
+    assert.equal(emptyCommentRes.body.success, false);
+  });
 });
+

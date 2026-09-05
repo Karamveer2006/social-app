@@ -2,13 +2,17 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Production Backend URL (e.g. deployed on Render / Railway)
+export const PRODUCTION_API_URL = 'https://taskplanet-social-backend.onrender.com/api';
+
 // In Android emulator, 10.0.2.2 maps to computer localhost; iOS simulator uses localhost
-const DEFAULT_URL =
+const LOCAL_URL =
   Platform.OS === 'android'
     ? 'http://10.0.2.2:5001/api'
     : 'http://localhost:5001/api';
 
-export const API_BASE_URL = DEFAULT_URL;
+// Automatically uses LOCAL_URL in development (__DEV__ === true) and PRODUCTION_API_URL in release builds
+export const API_BASE_URL = __DEV__ ? LOCAL_URL : PRODUCTION_API_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -82,7 +86,11 @@ export const usersAPI = {
     return res.data;
   },
   updateProfile: async (profileData) => {
-    const res = await api.put('/users/profile', profileData);
+    const isFormData = typeof FormData !== 'undefined' && profileData instanceof FormData;
+    const config = isFormData
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : {};
+    const res = await api.put('/users/profile', profileData, config);
     return res.data;
   },
   toggleFollow: async (userId) => {

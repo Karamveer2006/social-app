@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,20 +12,63 @@ import {
 } from 'react-native';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { getPostCardStyles } from '../styles/postCardStyles';
 
 dayjs.extend(relativeTime);
 
-export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => {
+export const PostCard = ({
+  post,
+  onToggleLike,
+  onAddComment,
+  onDeletePost,
+  onToggleFollow,
+  onPressAuthor,
+}) => {
   const { user, isAuthenticated } = useAuth();
+  const { colors, isDarkMode } = useTheme();
+  const styles = useMemo(() => getPostCardStyles(colors, isDarkMode), [colors, isDarkMode]);
+
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [replyingTo, setReplyingTo] = useState(null);
   const [submittingComment, setSubmittingComment] = useState(false);
 
   const isLiked = post.isLikedByMe;
-  const isAuthor = user && post.author?.userId && (user._id === post.author.userId);
+  const isAuthor =
+    user &&
+    ((post.author?.userId &&
+      user._id?.toString() === post.author.userId?.toString()) ||
+      (post.author?._id &&
+        user._id?.toString() === post.author._id?.toString()) ||
+      (user.username &&
+        post.author?.username &&
+        user.username.toLowerCase() === post.author.username.toLowerCase()));
+
+  const targetAuthorId = post.author?.userId || post.author?._id || post.author?.username;
+
+  const isFollowing =
+    !!post.isFollowingAuthor ||
+    (user?.following &&
+      targetAuthorId &&
+      user.following.some(
+        (id) =>
+          (id._id || id).toString() === post.author?.userId?.toString() ||
+          (id._id || id).toString() === post.author?._id?.toString() ||
+          (id.username || id).toString().toLowerCase() === post.author?.username?.toString().toLowerCase()
+      ));
+
+  const handleFollowPress = () => {
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please log in to follow creators.');
+      return;
+    }
+    if (onToggleFollow && targetAuthorId) {
+      onToggleFollow(post.author?.userId || post.author?._id || post.author?.username, post.author?.username);
+    }
+  };
 
   const handleLikePress = () => {
     if (!isAuthenticated) {
@@ -38,10 +81,12 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
   const handleSendComment = async () => {
     if (!commentText.trim() || submittingComment) return;
     const text = commentText.trim();
+    const replyTargetId = replyingTo?.commentId;
     setCommentText('');
+    setReplyingTo(null);
     setSubmittingComment(true);
     try {
-      await onAddComment(post._id, text);
+      await onAddComment(post._id, text, replyTargetId);
     } catch (err) {
       setCommentText(text);
     } finally {
@@ -49,55 +94,84 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
     }
   };
 
+  const handleReplyPress = (comment) => {
+    setReplyingTo({
+      commentId: comment._id,
+      username: comment.username || comment.name || 'user',
+    });
+  };
+
   return (
     <View style={styles.card}>
       {/* Author Header */}
       <View style={styles.header}>
-        <Image
-          source={{
-            uri:
-              post.author?.avatar ||
-              `https://api.dicebear.com/7.x/avataaars/png?seed=${post.author?.username || 'user'}`,
-          }}
-          style={styles.avatar}
-        />
-        <View style={styles.authorInfo}>
-          <Text style={styles.authorName}>{post.author?.name || post.author?.username}</Text>
-          <Text style={styles.authorUsername}>
-            @{post.author?.username} • {post.createdAt ? dayjs(post.createdAt).fromNow() : 'now'}
-          </Text>
-        </View>
-
-        {isAuthor && (
-          <TouchableOpacity
-            onPress={() => {
-              Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => onDeletePost(post._id) },
-              ]);
+        <TouchableOpacity
+          style={styles.authorTouchContainer}
+          onPress={() => onPressAuthor && onPressAuthor(post.author?.username)}
+          activeOpacity={0.7}
+        >
+          <Image
+            source={{
+              uri:
+                post.author?.avatar ||
+                `https://api.dicebear.com/7.x/avataaars/png?seed=${post.author?.username || 'taskplanet'}`,
             }}
-          >
+            style={styles.avatar}
+          />
+          <View style={styles.authorInfo}>
+            <Text style={styles.authorName}>{post.author?.name || 'TaskPlanet Creator'}</Text>
+            <Text style={styles.authorUsername}>
+              @{post.author?.username} • {dayjs(post.createdAt).fromNow()}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Follow / Following or Delete Button */}
+        {isAuthor ? (
+          <TouchableOpacity onPress={() => onDeletePost(post._id)} style={{ padding: 4 }}>
             <Text style={styles.deleteText}>Delete</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.headerFollowBtn,
+              isFollowing ? styles.headerFollowingBtn : styles.headerFollowBtnActive,
+            ]}
+            onPress={handleFollowPress}
+          >
+            <Text
+              style={[
+                styles.headerFollowBtnText,
+                isFollowing ? styles.headerFollowingBtnText : styles.headerFollowBtnActiveText,
+              ]}
+            >
+              {isFollowing ? '✓ Following' : '+ Follow'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Content Text */}
-      {!!post.content && <Text style={styles.content}>{post.content}</Text>}
+      {/* Post Text Content */}
+      {post.content ? <Text style={styles.content}>{post.content}</Text> : null}
 
-      {/* Post Image */}
-      {!!post.imageUrl && (
+      {/* Post Image (if any) */}
+      {post.imageUrl ? (
         <Image
           source={{ uri: post.imageUrl }}
           style={styles.postImage}
           resizeMode="cover"
         />
-      )}
+      ) : null}
 
-      {/* Actions (Like & Comment) */}
+      {/* Action Bar (Likes & Comments) */}
       <View style={styles.actionBar}>
+        {/* Like Button */}
         <View style={styles.actionGroup}>
-          <TouchableOpacity onPress={handleLikePress} style={styles.actionBtn}>
+          <TouchableOpacity
+            onPress={handleLikePress}
+            style={[styles.actionBtn, isLiked && styles.likedBtn]}
+            activeOpacity={0.7}
+          >
             <Text style={[styles.actionIcon, isLiked && styles.likedIcon]}>
               {isLiked ? '❤️' : '🤍'}
             </Text>
@@ -109,6 +183,7 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
           </TouchableOpacity>
         </View>
 
+        {/* Comments Count */}
         <View style={styles.actionGroup}>
           <TouchableOpacity
             onPress={() => setShowCommentsModal(true)}
@@ -160,7 +235,20 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
                         {item.createdAt ? dayjs(item.createdAt).fromNow() : 'now'}
                       </Text>
                     </View>
+                    {item.replyToUsername && (
+                      <Text style={styles.replyingToHeaderLabel}>
+                        Replying to @{item.replyToUsername}
+                      </Text>
+                    )}
                     <Text style={styles.commentText}>{item.text}</Text>
+                    {isAuthenticated && (
+                      <TouchableOpacity
+                        style={styles.replyActionBtn}
+                        onPress={() => handleReplyPress(item)}
+                      >
+                        <Text style={styles.replyActionText}>Reply</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}
@@ -169,12 +257,24 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
               }
             />
 
+            {/* Replying banner */}
+            {replyingTo && (
+              <View style={styles.replyingBanner}>
+                <Text style={styles.replyingBannerText}>
+                  Replying to <Text style={{ fontWeight: '700' }}>@{replyingTo.username}</Text>
+                </Text>
+                <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                  <Text style={styles.cancelReplyText}>✕ Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Input bar */}
             {isAuthenticated ? (
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Write a comment..."
+                  placeholder={replyingTo ? `Reply to @${replyingTo.username}...` : 'Write a comment...'}
                   placeholderTextColor={colors.textSecondary}
                   value={commentText}
                   onChangeText={setCommentText}
@@ -197,7 +297,7 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
         </View>
       </Modal>
 
-      {/* Liked By Modal */}
+      {/* Likes Modal */}
       <Modal
         visible={showLikesModal}
         animationType="fade"
@@ -207,7 +307,7 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
         <View style={styles.modalOverlay}>
           <View style={styles.modalContentSmall}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Liked By ({post.likesCount || 0})</Text>
+              <Text style={styles.modalTitle}>Liked by ({post.likes?.length || post.likesCount || 0})</Text>
               <TouchableOpacity onPress={() => setShowLikesModal(false)}>
                 <Text style={styles.closeBtn}>✕</Text>
               </TouchableOpacity>
@@ -226,7 +326,7 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
                     }}
                     style={styles.commentAvatar}
                   />
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text style={styles.commentUser}>{item.name || item.username}</Text>
                     <Text style={styles.authorUsername}>@{item.username}</Text>
                   </View>
@@ -243,213 +343,4 @@ export const PostCard = ({ post, onToggleLike, onAddComment, onDeletePost }) => 
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
-  authorInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  authorName: {
-    fontWeight: '700',
-    fontSize: 15,
-    color: colors.text,
-  },
-  authorUsername: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  deleteText: {
-    color: colors.heart,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  content: {
-    paddingHorizontal: 14,
-    paddingBottom: 10,
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.text,
-  },
-  postImage: {
-    width: '100%',
-    height: 240,
-    backgroundColor: '#F8FAFC',
-  },
-  actionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    gap: 20,
-  },
-  actionGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  actionBtn: {
-    padding: 2,
-  },
-  actionIcon: {
-    fontSize: 18,
-  },
-  likedIcon: {
-    transform: [{ scale: 1.1 }],
-  },
-  actionCount: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  likedText: {
-    color: colors.heart,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 18,
-    maxHeight: '75%',
-    minHeight: '40%',
-  },
-  modalContentSmall: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    marginHorizontal: 24,
-    marginVertical: 'auto',
-    padding: 18,
-    maxHeight: 380,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  closeBtn: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    padding: 4,
-  },
-  commentItem: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  commentAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 10,
-  },
-  commentBody: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  commentMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 3,
-  },
-  commentUser: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  commentTime: {
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  commentText: {
-    fontSize: 13,
-    color: colors.text,
-  },
-  likeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginVertical: 20,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 10,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  sendBtn: {
-    marginLeft: 10,
-    backgroundColor: colors.primary,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  sendText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  loginHint: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 12,
-    paddingTop: 10,
-  },
-});
+export default PostCard;

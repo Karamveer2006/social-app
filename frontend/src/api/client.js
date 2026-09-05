@@ -92,7 +92,11 @@ export const usersAPI = {
     return res.data;
   },
   updateProfile: async (profileData) => {
-    const res = await api.put('/users/profile', profileData);
+    const isFormData = typeof FormData !== 'undefined' && profileData instanceof FormData;
+    const config = isFormData
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : {};
+    const res = await api.put('/users/profile', profileData, config);
     return res.data;
   },
   toggleFollow: async (userId) => {

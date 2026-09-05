@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# React Native / Metro
+.metro-health-check*
+*.bundle
+*.jsbundle
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/.cxx/
+android/captures/
+android/local.properties
+android/app/debug.keystore.lock
+*.keystore
+*.jks
+!android/app/debug.keystore
+
+# iOS build artifacts & Xcode state
+ios/Pods/
+ios/build/
+ios/DerivedData/
+ios/.xcode.env.local
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Fastlane
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots/
+**/fastlane/test_output/
+
+# OS & Editor
+.DS_Store
+.idea/
+.vscode/
