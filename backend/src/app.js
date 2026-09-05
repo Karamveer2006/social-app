@@ -28,19 +28,57 @@ app.use(
 // Response compression
 app.use(compression());
 
-// Dynamic CORS configuration
-const clientUrl = process.env.CLIENT_URL;
-const allowedOrigins = clientUrl
-  ? [clientUrl, 'http://localhost:5173', 'http://localhost:3000']
-  : '*';
+// Dynamic CORS configuration supporting local dev, Vercel deployments, and configured CLIENT_URL
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5001',
+];
 
-app.use(
-  cors({
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+if (process.env.CLIENT_URL) {
+  process.env.CLIENT_URL.split(',').forEach((url) => {
+    const clean = url.trim().replace(/\/+$/, '');
+    if (clean) allowedOrigins.push(clean);
+  });
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    const cleanOrigin = origin.trim().replace(/\/+$/, '');
+
+    // Allow configured origins
+    if (allowedOrigins.includes(cleanOrigin)) {
+      return callback(null, true);
+    }
+
+    // Automatically allow all Vercel deployments (*.vercel.app)
+    try {
+      const parsedHostname = new URL(cleanOrigin).hostname;
+      if (parsedHostname.endsWith('.vercel.app') || parsedHostname === 'vercel.app') {
+        return callback(null, true);
+      }
+    } catch {
+      // Ignore URL parse errors
+    }
+
+    // Allow localhost/local network
+    if (cleanOrigin.includes('localhost') || cleanOrigin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+
+    // Allow all other origins in production to prevent blocking public web/mobile clients
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Body parser
 app.use(express.json({ limit: '10mb' }));
@@ -97,7 +135,7 @@ app.get('/', (req, res) => {
 });
 
 // Enhanced production health check
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   const dbState = mongoose.connection.readyState;
   const dbStatusMap = {
     0: 'disconnected',
@@ -129,10 +167,10 @@ app.get('/api/health', (req, res) => {
 // Apply API rate limiting
 app.use('/api', apiLimiter);
 
-// Mount feature routes
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/posts', postRoutes);
-app.use('/api/users', userRoutes);
+// Mount feature routes (support both /api/* and root paths for robustness)
+app.use(['/api/auth', '/auth'], authLimiter, authRoutes);
+app.use(['/api/posts', '/posts'], postRoutes);
+app.use(['/api/users', '/users'], userRoutes);
 
 // 404 Catch-all handler
 app.use((req, res, next) => {
